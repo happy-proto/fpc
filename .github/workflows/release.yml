@@ -99,7 +99,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools
+          sudo apt-get install -y musl-tools binutils
           echo CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc >> "$GITHUB_ENV"
           echo CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
@@ -118,6 +118,27 @@ jobs:
           fi
           "$build_tool" test --locked --target "$TARGET"
           "$build_tool" build --release --locked --target "$TARGET"
+      - name: Verify binary runtime dependencies
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          binary="target/$TARGET/release/fpc"
+          if [ "$RUNNER_OS" = Linux ]; then
+            readelf --program-headers "$binary" > program-headers.txt
+            readelf --dynamic "$binary" > dynamic-section.txt
+            if grep -w INTERP program-headers.txt || grep -F '(NEEDED)' dynamic-section.txt; then
+              echo 'Linux release binary must be fully statically linked.' >&2
+              exit 1
+            fi
+          else
+            otool -L "$binary" | awk '
+              NR > 1 {
+                print $1
+                if ($1 !~ /^\/usr\/lib\// && $1 !~ /^\/System\/Library\//) invalid = 1
+              }
+              END { exit invalid }
+            '
+          fi
       - name: Package and smoke-test archive
         env:
           TARGET: ${{ matrix.target }}
