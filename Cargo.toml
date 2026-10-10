@@ -6,6 +6,11 @@ description = "Pick files and directories and copy their absolute paths"
 license = "MIT"
 repository = "https://github.com/happy-proto/fpc"
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }-v{ version }.txz"
+bin-dir = "{ name }-{ target }-v{ version }/{ bin }{ binary-ext }"
+pkg-fmt = "txz"
+
 [dependencies]
 anyhow = "1.0.104"
 base64 = "0.23.1"
