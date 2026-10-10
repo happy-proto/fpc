@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.1.1
+        with:
+          install_args: uv jactionlint
+      - name: Lint workflows
+        if: runner.os == 'Linux'
+        run: jactionlint --no-online --shellcheck= --pyflakes=
+      - name: Install shells (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bash bash-completion fish zsh
+      - name: Install shells (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install bash bash-completion@2 fish zsh
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: jdx/mr-boxington-action@v1
+      - run: mbx fmt --check --all
+      - run: mbx clippy --all-targets --locked -- -D warnings
+      - run: mbx test --locked
+      - name: Shell completion E2E
+        run: |
+          mbx build --locked
+          ./tests/e2e/cli_behavior.py target/debug/fpc
+          ./tests/e2e/release_checks.py
+          ./tests/e2e/shell_completion.py target/debug/fpc
+
+  required:
+    name: required
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: ci
+    if: always()
+    steps:
+      - name: Require all checks to pass
+        env:
+          RESULT: ${{ needs.ci.result }}
+        run: test "$RESULT" = success

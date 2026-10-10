@@ -1,0 +1,27 @@
+[package]
+name = "fpc"
+version = "0.0.1"
+edition = "2024"
+description = "Pick files and directories and copy their absolute paths"
+license = "MIT"
+repository = "https://github.com/happy-proto/fpc"
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }-v{ version }.txz"
+bin-dir = "{ name }-{ target }-v{ version }/{ bin }{ binary-ext }"
+pkg-fmt = "txz"
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+clap = { version = "4.6.7", features = ["derive"] }
+clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
+crossterm = { version = "0.29.0", features = ["use-dev-tty"] }
+ignore = "0.4.33"
+nucleo-matcher = "0.3.1"
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+shadow-rs = { version = "2.0.0", default-features = false }
+tempfile = "3.27.0"
+
+[build-dependencies]
+shadow-rs = { version = "2.0.0", default-features = false, features = ["build"] }
