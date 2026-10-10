@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -28,9 +32,14 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - uses: jdx/mise-action@v5.1.1
         with:
-          install_args: uv
+          install_args: uv jactionlint
+      - name: Lint workflows
+        if: runner.os == 'Linux'
+        run: jactionlint --no-online --shellcheck= --pyflakes=
       - name: Install shells (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -59,6 +68,7 @@ jobs:
   required:
     name: required
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: ci
     if: always()
     steps:

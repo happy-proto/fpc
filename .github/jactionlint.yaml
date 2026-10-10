@@ -1,0 +1,3 @@
+rules:
+  unpinned-uses: off
+  dependabot-cooldown: off

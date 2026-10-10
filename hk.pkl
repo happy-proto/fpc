@@ -1,6 +1,10 @@
 amends "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Config.pkl"
 
 local checks = new Mapping<String, Step> {
+  ["workflows"] {
+    glob = List(".github/workflows/*.yml", ".github/workflows/*.yaml", ".github/dependabot.yml", ".github/jactionlint.yaml", "mise.toml", "hk.pkl")
+    check = "jactionlint --no-online --shellcheck= --pyflakes="
+  }
   ["diff"] {
     check = "git diff --check && git diff --cached --check"
   }
