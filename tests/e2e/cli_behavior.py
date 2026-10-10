@@ -219,7 +219,7 @@ def verify_build_information(binary):
     lines = result.stdout.splitlines()
     assert not result.stderr and lines[0] == f"fpc {package['version']}", result
     fields = dict(line.split(": ", 1) for line in lines[1:] if ": " in line)
-    commit = fields["Commit"].removesuffix(" (modified)")
+    commit = fields["Commit"].removesuffix(" (dirty)")
     assert commit == "unknown" or (
         len(commit) == 40
         and all(character in "0123456789abcdef" for character in commit)

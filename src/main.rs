@@ -18,16 +18,16 @@ const COMMIT: &str = if build::COMMIT_HASH.is_empty() {
 } else {
     build::COMMIT_HASH
 };
-const MODIFIED: &str = if build::COMMIT_HASH.is_empty() || build::GIT_CLEAN {
+const DIRTY: &str = if build::COMMIT_HASH.is_empty() || build::GIT_CLEAN {
     ""
 } else {
-    " (modified)"
+    " (dirty)"
 };
 const LONG_VERSION: &str = shadow_rs::formatcp!(
     "{}\nCommit: {}{}\nBuilt: {}\nTarget: {}\nRust: {}\n\n{}",
     build::PKG_VERSION,
     COMMIT,
-    MODIFIED,
+    DIRTY,
     build::BUILD_TIME_3339,
     build::BUILD_TARGET,
     build::RUST_VERSION,
