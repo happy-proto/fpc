@@ -10,6 +10,8 @@ mise run test
 
 Checks cover formatting, Clippy, workflows, and fast tests without changing your clipboard or requiring shell completion frameworks. Python scripts use uv, which downloads Python 3.15+ and their dependencies automatically.
 
+CI maintains the shared GitHub Actions caches. Release and terminal acceptance workflows restore those caches with read-only access, avoiding competing uploads without creating separate cache entries for each workflow.
+
 Use `mise run install` to try your changes locally. `mise run setup` optionally installs Git hooks. CI also tests Bash, Fish, Zsh, and real clipboard behavior on Linux and macOS.
 
 Open a PR from a separate branch with an English Conventional Commit title. Describe the change and test relevant behavior. PRs are squash-merged into `main`.

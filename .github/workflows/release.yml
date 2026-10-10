@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+# CI owns shared cache writes; release jobs reuse its entries.
+cache-mode: read
+
 defaults:
   run:
     shell: bash
