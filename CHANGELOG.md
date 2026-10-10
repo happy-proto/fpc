@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional ignore rules and explicit ignore files.
 - Native clipboard, SSH OSC 52, and tmux clipboard support, with path output as a fallback.
 - Dynamic shell completion with explicit installation into standalone files for fish, bash, and zsh, without editing shell startup files; Bash installation checks for bash-completion first.
-- Path-only Tab completion, excluding command options and the standalone current-directory entry.
+- Path-first Tab completion without a standalone current-directory entry, with option suggestions after `--` and typed option values such as shell names.
 - Isolated shell completion E2E checks on Linux and macOS, including real Tab presses and quoted paths, with a required CI gate.
 - English and Chinese README, contribution and release conventions, and a Keep a Changelog change log.
 - mise development tasks, mbx-backed macOS/Linux CI, and Cargo/GitHub Actions dependency updates.

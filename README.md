@@ -20,7 +20,7 @@ fpc --print ./src/main.rs    # Print the path instead of copying
 fpc --install-completion fish # Install dynamic Tab completion (also bash and zsh)
 ```
 
-Hidden files and ignored paths are included by default. Hidden paths rank slightly lower unless explicitly requested, while close matches remain easy to find. Tab completion offers only files and directories within the path being typed, without CLI options or a standalone `.` entry; use the picker for recursive searches.
+Hidden files and ignored paths are included by default. Hidden paths rank slightly lower unless explicitly requested, while close matches remain easy to find. Tab completion normally offers files and directories within the path being typed, without a standalone `.` entry; use the picker for recursive searches. Type `--` to complete options. Option values complete according to their type, including shell names after `--install-completion`.
 
 In the picker, type to search, use arrow keys or Tab to select, Enter to copy, and Esc to cancel. Paths become absolute without resolving symlinks; a link keeps its own path, even if its target is missing.
 
