@@ -1,0 +1,68 @@
+name: Terminal acceptance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clipboard:
+    name: Ghostty clipboard (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+      - uses: jdx/mr-boxington-action@d0825fbaf3cc36ca2609aa38e71046265a1f1e37 # v1
+      - name: Install terminal environment (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server tmux xclip xvfb dbus-x11 libgl1-mesa-dri libgtk-4-1
+          sudo mkdir -p /run/sshd
+          curl --fail --location --output "$RUNNER_TEMP/ghostty.AppImage" https://github.com/pkgforge-dev/ghostty-appimage/releases/download/v1.3.1/Ghostty-1.3.1-x86_64.AppImage
+          echo "fde48d2b716afd1978766879bbf1aae30dd305e8ad86a1037a2614a14d82dc28  $RUNNER_TEMP/ghostty.AppImage" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/ghostty.AppImage"
+          cd "$RUNNER_TEMP"
+          ./ghostty.AppImage --appimage-extract
+          echo "GHOSTTY_BINARY=$RUNNER_TEMP/squashfs-root/AppRun" >> "$GITHUB_ENV"
+      - name: Install terminal environment (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install tmux
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+          curl --fail --location --output "$RUNNER_TEMP/Ghostty.dmg" https://release.files.ghostty.org/1.3.1/Ghostty.dmg
+          echo "18cff2b0a6cee90eead9c7d3064e808a252a40baf214aa752c1ecb793b8f5f69  $RUNNER_TEMP/Ghostty.dmg" | shasum -a 256 --check
+          hdiutil attach "$RUNNER_TEMP/Ghostty.dmg" -nobrowse -mountpoint "$RUNNER_TEMP/ghostty-volume"
+          ditto "$RUNNER_TEMP/ghostty-volume/Ghostty.app" "$RUNNER_TEMP/Ghostty.app"
+          hdiutil detach "$RUNNER_TEMP/ghostty-volume"
+          echo "GHOSTTY_BINARY=$RUNNER_TEMP/Ghostty.app/Contents/MacOS/ghostty" >> "$GITHUB_ENV"
+      - run: mbx build --locked
+      - name: Clipboard acceptance (Linux)
+        if: runner.os == 'Linux'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GDK_BACKEND: x11
+        run: dbus-run-session -- xvfb-run -a -s '-screen 0 1280x800x24' python3 tests/acceptance/clipboard.py target/debug/fpc --artifacts acceptance-artifacts
+      - name: Clipboard acceptance (macOS)
+        if: runner.os == 'macOS'
+        run: python3 tests/acceptance/clipboard.py target/debug/fpc --artifacts acceptance-artifacts
+      - name: Upload terminal diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: terminal-acceptance-${{ matrix.os }}
+          path: acceptance-artifacts
+          if-no-files-found: ignore
