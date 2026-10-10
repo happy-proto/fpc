@@ -1,6 +1,10 @@
+#!/usr/bin/env -S uv run --script
+#
 # /// script
-# requires-python = ">=3.11"
-# dependencies = []
+# requires-python = ">=3.15"
+# dependencies = [
+#     "typer>=0.27.3",
+# ]
 # ///
 
 import base64
@@ -12,11 +16,15 @@ import select
 import signal
 import struct
 import subprocess
-import sys
 import tempfile
 import termios
 import time
 from pathlib import Path
+from typing import Annotated
+
+import typer
+
+app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
 
 class Process:
@@ -199,9 +207,19 @@ def verify_picker(binary, root):
     assert output.stderr, output
 
 
-def main():
-    binary = Path(sys.argv[1]).resolve()
-    assert binary.is_file(), f"Build fpc first: {binary}"
+@app.command(help="Verify picker and remote clipboard behavior through isolated PTYs.")
+def main(
+    binary: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+            help="Built fpc executable to test; no desktop, SSH server, or clipboard required.",
+        ),
+    ],
+):
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="fpc-behavior-") as temporary:
         root = Path(temporary).resolve()
@@ -217,4 +235,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    app()

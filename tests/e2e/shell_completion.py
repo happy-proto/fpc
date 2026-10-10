@@ -1,9 +1,12 @@
+#!/usr/bin/env -S uv run --script
+#
 # /// script
-# requires-python = ">=3.11"
-# dependencies = []
+# requires-python = ">=3.15"
+# dependencies = [
+#     "typer>=0.27.3",
+# ]
 # ///
 
-import argparse
 import errno
 import fcntl
 import os
@@ -19,7 +22,20 @@ import sys
 import tempfile
 import termios
 import time
+from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
+
+import typer
+
+app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
+
+
+class Shell(StrEnum):
+    bash = "bash"
+    fish = "fish"
+    zsh = "zsh"
+
 
 PROMPT = "FPC_READY> "
 ANSI = re.compile(
@@ -207,14 +223,27 @@ def verify(shell, executable, binary, completion_framework):
     )
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Verify real shell completion")
-    parser.add_argument("binary", type=Path)
-    parser.add_argument("--shell", action="append", choices=["bash", "fish", "zsh"])
-    arguments = parser.parse_args()
-    binary = arguments.binary.resolve()
-    assert binary.is_file(), f"Build fpc first: {binary}"
-    shells = arguments.shell or ["bash", "fish", "zsh"]
+@app.command(help="Verify real Tab completion in isolated shell sessions.")
+def main(
+    binary: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+            help="Built fpc executable to test.",
+        ),
+    ],
+    selected_shells: Annotated[
+        list[Shell] | None,
+        typer.Option(
+            "--shell",
+            help="Shell to test; repeat for multiple shells. Defaults to bash, fish, and zsh; missing prerequisites always fail.",
+        ),
+    ] = None,
+):
+    shells = selected_shells or list(Shell)
     completion_framework = None
     if "bash" in shells:
         completion_framework = framework()
@@ -225,4 +254,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    app()
