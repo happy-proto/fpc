@@ -74,8 +74,6 @@ jobs:
             target: x86_64-unknown-linux-musl
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
           - os: macos-15
             target: aarch64-apple-darwin
     steps:
@@ -94,17 +92,12 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
       - uses: jdx/mr-boxington-action@v1
-        if: runner.os != 'macOS' || runner.arch != 'X64'
       - name: Test and build release binary
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          build_tool=mbx
-          if [ "$RUNNER_OS" = macOS ] && [ "$RUNNER_ARCH" = X64 ]; then
-            build_tool=cargo
-          fi
-          "$build_tool" test --locked --target "$TARGET"
-          "$build_tool" build --release --locked --target "$TARGET"
+          mbx test --locked --target "$TARGET"
+          mbx build --release --locked --target "$TARGET"
       - name: Verify binary runtime dependencies
         env:
           TARGET: ${{ matrix.target }}
@@ -187,7 +180,7 @@ jobs:
           name: release-notes
       - name: Verify artifacts
         run: |
-          test "$(find dist -name '*.txz' | wc -l)" -eq 4
+          test "$(find dist -name '*.txz' | wc -l)" -eq 3
           (cd dist && sha256sum ./*.txz > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
       - name: Publish a new stable release

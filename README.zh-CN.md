@@ -20,7 +20,13 @@ cargo binstall --git https://github.com/happy-proto/fpc \
   --strategies crate-meta-data --force --no-confirm fpc
 ```
 
-提供 Linux 和 macOS 的 x86-64、ARM64 预编译二进制。`--force` 确保 Cargo 包版本未变化时也能更新 nightly 二进制。
+提供 Linux 的 x86-64、ARM64 和 macOS 的 ARM64 预编译二进制。`--force` 确保 Cargo 包版本未变化时也能更新 nightly 二进制。
+
+Intel Mac 可以从源码构建安装：
+
+```sh
+cargo install --git https://github.com/happy-proto/fpc --locked fpc
+```
 
 ## 使用方式
 

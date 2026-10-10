@@ -20,7 +20,13 @@ cargo binstall --git https://github.com/happy-proto/fpc \
   --strategies crate-meta-data --force --no-confirm fpc
 ```
 
-Prebuilt binaries are available for Linux and macOS on x86-64 and ARM64. `--force` updates the nightly binary even when its Cargo package version has not changed.
+Prebuilt binaries are available for Linux on x86-64 and ARM64, and for macOS on ARM64. `--force` updates the nightly binary even when its Cargo package version has not changed.
+
+On Intel Macs, build and install from source:
+
+```sh
+cargo install --git https://github.com/happy-proto/fpc --locked fpc
+```
 
 ## Usage
 
