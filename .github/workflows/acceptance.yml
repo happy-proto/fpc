@@ -22,6 +22,9 @@ jobs:
         os: [ubuntu-24.04, macos-15]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: uv
       - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
           toolchain: stable
@@ -55,10 +58,10 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           GDK_BACKEND: x11
-        run: dbus-run-session -- xvfb-run -a -s '-screen 0 1280x800x24' python3 tests/acceptance/clipboard.py target/debug/fpc --artifacts acceptance-artifacts
+        run: dbus-run-session -- xvfb-run -a -s '-screen 0 1280x800x24' ./tests/acceptance/clipboard.py target/debug/fpc --artifacts acceptance-artifacts
       - name: Clipboard acceptance (macOS)
         if: runner.os == 'macOS'
-        run: python3 tests/acceptance/clipboard.py target/debug/fpc --artifacts acceptance-artifacts
+        run: ./tests/acceptance/clipboard.py target/debug/fpc --artifacts acceptance-artifacts
       - name: Upload terminal diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

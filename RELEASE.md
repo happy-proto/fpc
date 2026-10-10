@@ -8,7 +8,7 @@ Use this procedure for each stable release. Versions follow [Semantic Versioning
 2. Set the version with `cargo set-version <version>` when it changes, then run `cargo check` to update the lockfile. Do not edit version fields or the lockfile manually.
 3. Move the relevant `Unreleased` entries in `CHANGELOG.md` into `## [<version>] - YYYY-MM-DD`, using the actual planned publication date. Keep an `Unreleased` section above it and omit empty categories. Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 4. Link the version heading to its GitHub release. Update the `Unreleased` link to compare the new tag against `HEAD`; for later versions, include a comparison with the preceding tag.
-5. Review installation instructions and both README files when behavior or supported platforms change. Run `mise run check`, `mise run test`, `cargo package --locked`, and `python3 scripts/release_notes.py v<version>`.
+5. Review installation instructions and both README files when behavior or supported platforms change. Run `mise run check`, `mise run test`, `cargo package --locked`, and `./scripts/release_notes.py v<version>`.
 6. Open an English PR to `main`. Require the fast checks, complete shell tests, native Ghostty clipboard acceptance on Linux and macOS, and all four release archive builds to pass. Inspect the artifacts and resolve failures before squash-merging.
 
 The PR and manual Release workflow only build and upload artifacts. They do not publish. `scripts/release_notes.py` validates the tag/version/date/link agreement and extracts the maintained notes; an `Unreleased`-only changelog intentionally fails release validation.

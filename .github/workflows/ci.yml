@@ -29,6 +29,9 @@ jobs:
           - macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: uv
       - name: Install shells (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -50,9 +53,9 @@ jobs:
       - name: Shell completion E2E
         run: |
           mbx build --locked
-          python3 tests/e2e/cli_behavior.py target/debug/fpc
-          python3 tests/e2e/release_checks.py
-          python3 tests/e2e/shell_completion.py target/debug/fpc
+          ./tests/e2e/cli_behavior.py target/debug/fpc
+          ./tests/e2e/release_checks.py
+          ./tests/e2e/shell_completion.py target/debug/fpc
 
   required:
     name: required

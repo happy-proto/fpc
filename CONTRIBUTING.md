@@ -11,6 +11,8 @@ mise run check
 mise run test
 ```
 
+Python test and release scripts are executable single-file CLIs managed by uv. They declare Python 3.15+ and their dependencies inline; uv obtains the interpreter and packages automatically, so no separate Python installation is required. Run the script directly or use `uv run --script <script>` where direct execution is unavailable. CI uses the same uv version configured in `mise.toml`.
+
 `mise run check` runs formatting and Clippy. `mise run test` runs the Rust tests, fast PTY behavior tests, and release validation tests. These commands use the same test selection on every machine and do not require a GUI, SSH server, shell completion framework, or access to your clipboard. Use `mise run build` to build the release binary and `mise run install` to install it from this checkout. `mise run ci` runs the local checks and fast tests together.
 
 Test public behavior, edge cases, and regressions. When fixing a bug, first reproduce it with a failing test when practical. Clipboard tests should use isolated command stubs or terminal fixtures, rather than overwrite a contributor's real clipboard.

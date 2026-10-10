@@ -1,6 +1,7 @@
 [tools]
 hk = { version = "2.5.0", workflow = "release.yml" }
 mr-boxington = { version = "1.23.0", workflow = "release.yml@refs/heads/main" }
+uv = "0.13.0"
 
 [tasks.check]
 description = "Check formatting and lint all targets"
@@ -8,7 +9,7 @@ run = ["cargo fmt --check", "mbx clippy --all-targets --locked -- -D warnings"]
 
 [tasks.test]
 description = "Run fast tests without desktop or shell framework dependencies"
-run = ["mbx test --locked", "uv run --script tests/e2e/cli_behavior.py target/debug/fpc", "uv run --script tests/e2e/release_checks.py"]
+run = ["mbx test --locked", "./tests/e2e/cli_behavior.py target/debug/fpc", "./tests/e2e/release_checks.py"]
 
 [tasks.build]
 description = "Build the release binary"
@@ -16,7 +17,7 @@ run = "mbx build --release --locked"
 
 [tasks.e2e]
 description = "Run complete shell completion tests in an environment prepared like CI"
-run = ["mbx build --locked", "uv run --script tests/e2e/shell_completion.py target/debug/fpc"]
+run = ["mbx build --locked", "./tests/e2e/shell_completion.py target/debug/fpc"]
 
 [tasks.install]
 description = "Install fpc from the current checkout"
@@ -38,4 +39,4 @@ depends = ["check", "test"]
 
 [tasks.acceptance]
 description = "Run native desktop clipboard acceptance explicitly"
-run = ["mbx build --locked", "uv run --script tests/acceptance/clipboard.py target/debug/fpc --allow-desktop"]
+run = ["mbx build --locked", "./tests/acceptance/clipboard.py target/debug/fpc --allow-desktop"]
