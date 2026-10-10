@@ -48,10 +48,8 @@ jobs:
       - name: Prepare nightly notes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fpc") | .version')"
           {
-            printf '# Nightly build\n\nCommit:\n\n%s\n\n' "$GITHUB_SHA"
-            printf 'Development build from main. Cargo version:\n\n%s\n\nThis is not a stable versioned release.\n\n' "$version"
+            printf '# Nightly build\n\nCommit: %s\n\n' "$GITHUB_SHA"
             printf '## Unreleased changes\n\n'
             awk '
               /^## \[Unreleased\]$/ { found = 1; next }
