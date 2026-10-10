@@ -77,12 +77,13 @@ def ssh_server(root):
         port = reservation.getsockname()[1]
     pidfile = root / "sshd.pid"
     config = root / "sshd_config"
+    pam = "yes" if platform.system() == "Linux" else "no"
     config.write_text(
         f"Port {port}\nListenAddress 127.0.0.1\n"
         f'HostKey "{host_key}"\nPidFile "{pidfile}"\n'
         f'AuthorizedKeysFile "{authorized}"\nAllowUsers {getpass.getuser()}\n'
         "StrictModes no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\n"
-        "PubkeyAuthentication yes\nUsePAM no\nLogLevel VERBOSE\n"
+        f"PubkeyAuthentication yes\nUsePAM {pam}\nLogLevel VERBOSE\n"
     )
     sshd_log = root / "sshd.log"
     sshd_log.touch(mode=0o600)
