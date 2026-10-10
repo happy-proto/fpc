@@ -9,6 +9,19 @@ Find a file or directory and copy its absolute path, with a short command.
 
 When pointing an Agent at a file, paths outside the workspace or hidden by `.gitignore` can be awkward to select. `fpc` makes them easy to find, locally or over SSH and tmux. Written in Rust, with a built-in fuzzy picker.
 
+## Install
+
+Install or update to the latest [nightly prerelease](https://github.com/happy-proto/fpc/releases/tag/nightly) with [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
+
+```sh
+cargo binstall --git https://github.com/happy-proto/fpc \
+  --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
+  --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
+  --strategies crate-meta-data --force --no-confirm fpc
+```
+
+Prebuilt binaries are available for Linux and macOS on x86-64 and ARM64. `--force` updates the nightly binary even when its Cargo package version has not changed.
+
 ## Usage
 
 ```sh

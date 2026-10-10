@@ -9,6 +9,19 @@
 
 给 Agent 指定文件时，工作区之外或被 `.gitignore` 忽略的路径往往不容易选择。`fpc` 让这些文件也能方便地找到，支持本地、SSH 和 tmux。使用 Rust 编写，内置模糊选择器。
 
+## 安装
+
+使用 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 安装或更新到最新的 [nightly 预发布版本](https://github.com/happy-proto/fpc/releases/tag/nightly)：
+
+```sh
+cargo binstall --git https://github.com/happy-proto/fpc \
+  --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
+  --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
+  --strategies crate-meta-data --force --no-confirm fpc
+```
+
+提供 Linux 和 macOS 的 x86-64、ARM64 预编译二进制。`--force` 确保 Cargo 包版本未变化时也能更新 nightly 二进制。
+
 ## 使用方式
 
 ```sh
