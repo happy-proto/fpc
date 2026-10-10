@@ -3,6 +3,7 @@
 # dependencies = []
 # ///
 
+import argparse
 import errno
 import fcntl
 import os
@@ -109,10 +110,11 @@ def verify(shell, executable, binary, completion_framework):
         (work / "folder/nested.txt").touch()
         (home / "bin").mkdir()
         (home / "bin/fpc").symlink_to(binary)
-        (home / "system/bash-completion").mkdir(parents=True)
-        (home / "system/bash-completion/bash_completion").symlink_to(
-            completion_framework
-        )
+        if completion_framework is not None:
+            (home / "system/bash-completion").mkdir(parents=True)
+            (home / "system/bash-completion/bash_completion").symlink_to(
+                completion_framework
+            )
         environment = {
             "HOME": str(home),
             "PATH": f"{home / 'bin'}:{os.environ['PATH']}",
@@ -205,10 +207,22 @@ def verify(shell, executable, binary, completion_framework):
     )
 
 
-binary = Path(sys.argv[1]).resolve()
-assert binary.is_file(), f"Build fpc first: {binary}"
-completion_framework = framework()
-for shell in ["bash", "fish", "zsh"]:
-    executable = shutil.which(shell)
-    assert executable, f"Required shell is missing: {shell}"
-    verify(shell, executable, binary, completion_framework)
+def main():
+    parser = argparse.ArgumentParser(description="Verify real shell completion")
+    parser.add_argument("binary", type=Path)
+    parser.add_argument("--shell", action="append", choices=["bash", "fish", "zsh"])
+    arguments = parser.parse_args()
+    binary = arguments.binary.resolve()
+    assert binary.is_file(), f"Build fpc first: {binary}"
+    shells = arguments.shell or ["bash", "fish", "zsh"]
+    completion_framework = None
+    if "bash" in shells:
+        completion_framework = framework()
+    for shell in shells:
+        executable = shutil.which(shell)
+        assert executable, f"Required shell is missing: {shell}"
+        verify(shell, executable, binary, completion_framework)
+
+
+if __name__ == "__main__":
+    main()
