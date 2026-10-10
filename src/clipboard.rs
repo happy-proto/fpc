@@ -3,16 +3,18 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use std::{
     env,
     fs::OpenOptions,
-    io::Write,
+    io::{Read, Seek, Write},
     process::{Command, Stdio},
 };
 
 fn command_copy(program: &str, args: &[&str], bytes: &[u8]) -> Result<()> {
+    // Clipboard owners may outlive their parent and keep inherited stderr open.
+    let mut stderr = tempfile::tempfile().context("Cannot create clipboard diagnostics")?;
     let mut child = Command::new(program)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(stderr.try_clone()?)
         .spawn()
         .with_context(|| format!("Cannot start {program}"))?;
     let written = child
@@ -20,14 +22,17 @@ fn command_copy(program: &str, args: &[&str], bytes: &[u8]) -> Result<()> {
         .take()
         .context("Cannot open clipboard input")?
         .write_all(bytes);
-    let output = child
-        .wait_with_output()
+    let status = child
+        .wait()
         .with_context(|| format!("Cannot wait for {program}"))?;
-    if !output.status.success() {
+    if !status.success() {
+        stderr.rewind()?;
+        let mut diagnostics = Vec::new();
+        stderr.take(64 * 1024).read_to_end(&mut diagnostics)?;
         bail!(
             "{program} exited with {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
+            status,
+            String::from_utf8_lossy(&diagnostics).trim()
         );
     }
     written.with_context(|| format!("Cannot write to {program}"))

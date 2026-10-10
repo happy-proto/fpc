@@ -17,6 +17,7 @@ import select
 import signal
 import struct
 import subprocess
+import sys
 import tempfile
 import termios
 import time
@@ -99,6 +100,48 @@ class Process:
 
 def environment(root):
     return {"HOME": str(root), "PATH": "/usr/bin:/bin", "TERM": "xterm-256color"}
+
+
+def verify_clipboard_owner(binary, root):
+    target = root / "owner path"
+    target.touch()
+    expected = os.fsencode(target.resolve())
+    stub = root / ("pbcopy" if sys.platform == "darwin" else "xclip")
+    log = root / "copied"
+    env = environment(root) | {"PATH": str(root), "DISPLAY": "fixture"}
+    for status in [0, 7, 8]:
+        stub.write_text(
+            "#!/bin/sh\n"
+            f'/bin/cat > "{log}"\n'
+            "/bin/sleep 30 &\n"
+            + ("printf 'clipboard fixture failed\\n' >&2\n" if status else "")
+            + ("/usr/bin/head -c 262144 /dev/zero >&2\n" if status == 8 else "")
+            + f"exit {status}\n"
+        )
+        stub.chmod(0o700)
+        process = subprocess.Popen(
+            [str(binary), str(target)],
+            cwd=root,
+            env=env,
+            start_new_session=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = process.communicate(timeout=3)
+            assert process.returncode == 0 and log.read_bytes() == expected
+            if status:
+                assert stdout == expected + b"\n", stdout
+                assert b"clipboard fixture failed" in stderr, stderr
+                assert len(stderr) < 65 * 1024, len(stderr)
+            else:
+                assert stdout == stderr == b"", (stdout, stderr)
+        finally:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=3)
 
 
 def remote_copy(binary, root):
@@ -256,6 +299,9 @@ def main(
     verify_build_information(binary)
     with tempfile.TemporaryDirectory(prefix="fpc-behavior-") as temporary:
         root = Path(temporary).resolve()
+        owner = root / "owner"
+        owner.mkdir()
+        verify_clipboard_owner(binary, owner)
         remote = root / "remote"
         remote.mkdir()
         remote_copy(binary, remote)
