@@ -5,7 +5,6 @@ mod picker;
 
 use anyhow::{Context, Result};
 use clap::{Parser, ValueHint};
-use clap_complete::CompleteEnv;
 use std::{
     io::{self, Write},
     path::PathBuf,
@@ -58,14 +57,14 @@ struct Cli {
     /// Print the absolute path instead of copying it
     #[arg(long)]
     print: bool,
-    /// Install dynamic completion (auto, fish, bash, or zsh)
-    #[arg(long, num_args = 0..=1, default_missing_value = "auto", value_enum,
+    /// Install dynamic completion (fish, bash, or zsh); omit the shell to detect it
+    #[arg(long, num_args = 0..=1, value_enum,
         conflicts_with_all = ["path", "respect_ignore", "ignore_file", "print"])]
-    install_completion: Option<completion::Shell>,
+    install_completion: Option<Option<completion::Shell>>,
 }
 
 fn run() -> Result<()> {
-    CompleteEnv::with_factory(completion::command).complete();
+    completion::complete();
     let cli = Cli::parse();
     if let Some(shell) = cli.install_completion {
         return completion::install(shell);

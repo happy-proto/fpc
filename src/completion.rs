@@ -1,19 +1,24 @@
 use anyhow::{Context, Result, bail};
-use clap::ValueEnum;
+use clap::{CommandFactory, ValueEnum};
 use clap_complete::engine::{
     ArgValueCompleter, CompletionCandidate, PathCompleter, ValueCompleter,
 };
+use clap_complete::{
+    CompleteEnv,
+    env::{Bash, EnvCompleter, Fish, Shells, Zsh},
+};
 use std::{
+    collections::HashSet,
     env,
-    ffi::OsStr,
-    fs,
+    ffi::{OsStr, OsString},
+    fs, io,
     path::{Path, PathBuf},
     process::Command,
+    sync::Mutex,
 };
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Shell {
-    Auto,
     Fish,
     Bash,
     Zsh,
@@ -23,20 +28,125 @@ const START: &str = "# >>> fpc completion >>>";
 const END: &str = "# <<< fpc completion <<<";
 
 pub fn command() -> clap::Command {
-    clap::Command::new("fpc")
-        .disable_help_flag(true)
-        .disable_version_flag(true)
-        .arg(
-            clap::Arg::new("path")
-                .num_args(0..)
-                .allow_hyphen_values(true)
-                .add(ArgValueCompleter::new(path_candidates)),
-        )
+    crate::Cli::command()
+        .mut_arg("path", |arg| {
+            arg.add(ArgValueCompleter::new(path_candidates))
+        })
+        .mut_arg("ignore_file", |arg| {
+            arg.add(ArgValueCompleter::new(file_candidates))
+        })
+        .mut_arg("install_completion", |arg| arg.num_args(1))
+}
+
+pub fn complete() {
+    CompleteEnv::with_factory(command)
+        .shells(Shells(&[
+            &ContextualCompleter(&Bash),
+            &ContextualCompleter(&Fish),
+            &ContextualCompleter(&Zsh),
+        ]))
+        .complete();
+}
+
+struct ContextualCompleter(&'static dyn EnvCompleter);
+
+impl EnvCompleter for ContextualCompleter {
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+
+    fn is(&self, name: &str) -> bool {
+        self.0.is(name)
+    }
+
+    fn write_registration(
+        &self,
+        var: &str,
+        name: &str,
+        bin: &str,
+        completer: &str,
+        buf: &mut dyn io::Write,
+    ) -> io::Result<()> {
+        self.0.write_registration(var, name, bin, completer, buf)
+    }
+
+    fn write_complete(
+        &self,
+        cmd: &mut clap::Command,
+        mut args: Vec<OsString>,
+        current_dir: Option<&Path>,
+        buf: &mut dyn io::Write,
+    ) -> io::Result<()> {
+        let index = if self.name() == "fish" {
+            args.len().saturating_sub(1)
+        } else {
+            env::var("_CLAP_COMPLETE_INDEX")
+                .ok()
+                .and_then(|index| index.parse().ok())
+                .unwrap_or_default()
+        };
+        if index == args.len() {
+            args.push(OsString::new());
+        }
+        let current = args
+            .get(index)
+            .map(|value| value.to_string_lossy())
+            .unwrap_or_default();
+        let complete_options = current.starts_with("--");
+        let mut candidates =
+            clap_complete::engine::complete(cmd, args.clone(), index, current_dir)?;
+        let options: HashSet<_> = cmd
+            .get_arguments()
+            .flat_map(|arg| {
+                arg.get_long_and_visible_aliases()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|name| format!("--{name}"))
+                    .chain(
+                        arg.get_short_and_visible_aliases()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|name| format!("-{name}")),
+                    )
+            })
+            .collect();
+        let is_option = |candidate: &CompletionCandidate| {
+            candidate.get_id().is_some()
+                && options.contains(candidate.get_value().to_string_lossy().as_ref())
+        };
+        if complete_options && candidates.iter().any(is_option) {
+            candidates.retain(is_option);
+        } else if !complete_options {
+            candidates.retain(|candidate| !is_option(candidate));
+        }
+        // A positional-only second pass preserves candidates while reusing clap's shell formatting.
+        let candidates = Mutex::new(candidates);
+        let mut output = clap::Command::new("fpc")
+            .disable_help_flag(true)
+            .disable_version_flag(true)
+            .arg(
+                clap::Arg::new("candidates")
+                    .num_args(0..)
+                    .allow_hyphen_values(true)
+                    .add(ArgValueCompleter::new(move |_: &OsStr| {
+                        std::mem::take(&mut *candidates.lock().unwrap())
+                    })),
+            );
+        self.0.write_complete(&mut output, args, current_dir, buf)
+    }
+}
+
+fn file_candidates(current: &OsStr) -> Vec<CompletionCandidate> {
+    complete_path(current, PathCompleter::file())
 }
 
 fn path_candidates(current: &OsStr) -> Vec<CompletionCandidate> {
+    complete_path(current, PathCompleter::any())
+}
+
+fn complete_path(current: &OsStr, completer: PathCompleter) -> Vec<CompletionCandidate> {
     let explicit_dot = current == OsStr::new(".");
-    PathCompleter::any()
+    completer
         .complete(if explicit_dot {
             OsStr::new("")
         } else {
@@ -75,8 +185,10 @@ fn bash_completion_available() -> bool {
     env::split_paths(&dirs).any(|dir| dir.join("bash-completion/bash_completion").is_file())
 }
 
-pub fn install(shell: Shell) -> Result<()> {
-    let shell = if matches!(shell, Shell::Auto) {
+pub fn install(shell: Option<Shell>) -> Result<()> {
+    let shell = if let Some(shell) = shell {
+        shell
+    } else {
         match env::var_os("SHELL")
             .as_deref()
             .and_then(|value| Path::new(value).file_name())
@@ -87,8 +199,6 @@ pub fn install(shell: Shell) -> Result<()> {
             Some("zsh") => Shell::Zsh,
             _ => bail!("Cannot detect shell; use --install-completion fish, bash, or zsh"),
         }
-    } else {
-        shell
     };
     let home = env_path("HOME").context("HOME is missing")?;
     let data = env_path("XDG_DATA_HOME").unwrap_or_else(|| home.join(".local/share"));
@@ -118,7 +228,6 @@ pub fn install(shell: Shell) -> Result<()> {
             data.join("zsh/site-functions/_fpc"),
             "if command -v fpc >/dev/null 2>&1; then\n    eval \"$(COMPLETE=zsh fpc)\"\n    if [[ ${_comps[fpc]} != _fpc && -n ${_comps[fpc]} ]]; then\n        \"${_comps[fpc]}\" \"$@\"\n    fi\nfi",
         ),
-        Shell::Auto => unreachable!(),
     };
     let old = match fs::read_to_string(&path) {
         Ok(content) => content,
