@@ -13,9 +13,6 @@ on:
 permissions:
   contents: read
 
-# CI owns shared cache writes; release jobs reuse its entries.
-cache-mode: read
-
 defaults:
   run:
     shell: bash
@@ -28,6 +25,8 @@ jobs:
   prepare:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # Package validation reuses the native debug cache maintained by CI.
+    cache-mode: read
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -92,6 +91,10 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
       - uses: jdx/mr-boxington-action@v1
+        with:
+          # Scope both saved keys and restore prefixes to this build target.
+          # The action saves only on default-branch pushes by default.
+          cache-generation: release-v1-${{ matrix.target }}
       - name: Test and build release binary
         env:
           TARGET: ${{ matrix.target }}
