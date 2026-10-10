@@ -81,10 +81,10 @@ fn run() -> Result<()> {
             path
         }
     };
-    // Match realpath: validate existence and resolve symlinks and parent components.
-    let path = path
-        .canonicalize()
-        .with_context(|| format!("Cannot resolve {}", path.display()))?;
+    std::fs::symlink_metadata(&path)
+        .with_context(|| format!("Cannot access {}", path.display()))?;
+    let path = std::path::absolute(&path)
+        .with_context(|| format!("Cannot make {} absolute", path.display()))?;
     #[cfg(unix)]
     let bytes = {
         use std::os::unix::ffi::OsStrExt;

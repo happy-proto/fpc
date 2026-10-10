@@ -22,7 +22,7 @@ fpc --install-completion fish # 安装动态 Tab 补全，也支持 bash 和 zsh
 
 默认包含隐藏项和被忽略的路径。隐藏路径略微降权，显式搜索隐藏项时取消降权，高度相关的结果仍容易选中。Tab 只补全当前路径层级中的文件和目录，不展示命令选项或单独的 `.`，递归搜索交给交互式选择器。
 
-选择器中直接输入查询，用方向键或 Tab 选择，Enter 复制，Esc 取消。路径处理与 `realpath` 一致，会解析符号链接。
+选择器中直接输入查询，用方向键或 Tab 选择，Enter 复制，Esc 取消。路径会转换为绝对路径，不解析符号链接；即使目标不存在，也可以复制链接本身的路径。
 
 补全需要主动执行安装命令，只写独立文件，不修改 shell 启动配置。Fish 会自动加载；Bash 需要已安装并启用 `bash-completion`，检测不到时安装命令会报错退出。Zsh 需要在 `compinit` 前把 `${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions` 加入 `fpath`。安装命令会提示文件位置，升级程序通常无需重新安装补全。
 

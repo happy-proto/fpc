@@ -22,7 +22,7 @@ fpc --install-completion fish # Install dynamic Tab completion (also bash and zs
 
 Hidden files and ignored paths are included by default. Hidden paths rank slightly lower unless explicitly requested, while close matches remain easy to find. Tab completion offers only files and directories within the path being typed, without CLI options or a standalone `.` entry; use the picker for recursive searches.
 
-In the picker, type to search, use arrow keys or Tab to select, Enter to copy, and Esc to cancel. Paths are resolved like `realpath`, including symlinks.
+In the picker, type to search, use arrow keys or Tab to select, Enter to copy, and Esc to cancel. Paths become absolute without resolving symlinks; a link keeps its own path, even if its target is missing.
 
 Completion installation is explicit and writes a separate file without editing shell startup files. Fish loads it automatically; Bash requires installed and enabled `bash-completion` (installation fails if it cannot be detected). For Zsh, add `${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions` to `fpath` before `compinit`. The installer prints the location; upgrades usually do not require reinstalling completion.
 

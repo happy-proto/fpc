@@ -29,9 +29,23 @@ fn direct_paths_handle_spaces_newlines_symlinks_and_leading_dashes() {
     let path = root.join(name);
     fs::write(&path, "").unwrap();
     std::os::unix::fs::symlink(&path, root.join("link")).unwrap();
-    let mut expected = path.canonicalize().unwrap().as_os_str().as_bytes().to_vec();
-    expected.push(b'\n');
-    for args in [vec!["--print", "--", name], vec!["--print", "link"]] {
+    fs::create_dir(root.join("directory")).unwrap();
+    std::os::unix::fs::symlink(root.join("directory"), root.join("dir-link")).unwrap();
+    std::os::unix::fs::symlink(root.join("missing"), root.join("broken-link")).unwrap();
+    for (args, selected) in [
+        (vec!["--print", "--", name], name),
+        (vec!["--print", "link"], "link"),
+        (vec!["--print", "dir-link"], "dir-link"),
+        (vec!["--print", "broken-link"], "broken-link"),
+    ] {
+        let mut expected = root
+            .canonicalize()
+            .unwrap()
+            .join(selected)
+            .as_os_str()
+            .as_bytes()
+            .to_vec();
+        expected.push(b'\n');
         let output = cli(root).args(args).output().unwrap();
         assert!(output.status.success(), "{:?}", output);
         assert_eq!(output.stdout, expected);

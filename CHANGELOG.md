@@ -30,5 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Copy operations no longer print success messages; errors, clipboard fallback warnings, and explicit `--print` output remain visible.
 - Completion installation prints its destination on a separate line for easy selection and copying.
+- Absolute paths preserve symbolic links instead of resolving their targets, including dangling links.
 
 [Unreleased]: https://github.com/happy-proto/fpc/commits/main/
