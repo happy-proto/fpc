@@ -40,7 +40,10 @@ const LONG_VERSION: &str = shadow_rs::formatcp!(
     version,
     long_version = LONG_VERSION,
     about = "Pick a file or directory and copy its absolute path",
-    after_help = env!("CARGO_PKG_REPOSITORY")
+    after_help = concat!(
+        "Use --version for commit, build time, target, and compiler details.\n\n",
+        env!("CARGO_PKG_REPOSITORY")
+    )
 )]
 struct Cli {
     /// File or directory to copy; omit to open the fuzzy picker

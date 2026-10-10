@@ -235,6 +235,7 @@ def verify_build_information(binary):
         [str(binary), "--help"], capture_output=True, text=True, check=True
     )
     assert package["repository"] in help_output.stdout.splitlines(), help_output
+    assert "--version for commit" in help_output.stdout, help_output
     assert not help_output.stderr, help_output
 
 
