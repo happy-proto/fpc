@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - feat/**
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install shells (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bash bash-completion fish zsh
+      - name: Install shells (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install bash bash-completion@2 fish zsh
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: jdx/mr-boxington-action@d0825fbaf3cc36ca2609aa38e71046265a1f1e37 # v1
+      - run: mbx fmt --check --all
+      - run: mbx clippy --all-targets --locked -- -D warnings
+      - run: mbx test --locked
+      - name: Shell completion E2E
+        run: |
+          mbx build --locked
+          python3 tests/e2e/shell_completion.py target/debug/fpc
+
+  required:
+    name: required
+    runs-on: ubuntu-latest
+    needs: ci
+    if: always()
+    steps:
+      - name: Require all checks to pass
+        env:
+          RESULT: ${{ needs.ci.result }}
+        run: test "$RESULT" = success

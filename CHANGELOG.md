@@ -1,0 +1,28 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Interactive fuzzy selection of files and directories, including hidden and ignored paths by default.
+- Copy an absolute path directly from a positional argument.
+- Optional ignore rules and explicit ignore files.
+- Native clipboard, SSH OSC 52, and tmux clipboard support, with path output as a fallback.
+- Dynamic shell completion with explicit installation into standalone files for fish, bash, and zsh, without editing shell startup files; Bash installation checks for bash-completion first.
+- Path-only Tab completion, excluding command options and the standalone current-directory entry.
+- Isolated shell completion E2E checks on Linux and macOS, including real Tab presses and quoted paths, with a required CI gate.
+- English and Chinese README, contribution and release conventions, and a Keep a Changelog change log.
+- mise development tasks, mbx-backed macOS/Linux CI, and Cargo/GitHub Actions dependency updates.
+- A one-time `mise run setup` development initialization entry point, currently installing optional hk pre-commit hooks for whitespace, Rust formatting, and fast Rust tests.
+
+### Changed
+
+- Copy operations no longer print success messages; errors, clipboard fallback warnings, and explicit `--print` output remain visible.
+- Completion installation prints its destination on a separate line for easy selection and copying.
+
+[Unreleased]: https://github.com/happy-proto/fpc/commits/main/

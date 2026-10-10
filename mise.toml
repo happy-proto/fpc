@@ -1,0 +1,37 @@
+[tools]
+hk = { version = "2.5.0", workflow = "release.yml" }
+mr-boxington = { version = "1.23.0", workflow = "release.yml@refs/heads/main" }
+
+[tasks.check]
+description = "Check formatting and lint all targets"
+run = ["cargo fmt --check", "mbx clippy --all-targets --locked -- -D warnings"]
+
+[tasks.test]
+description = "Run the test suite"
+run = "mbx test --locked"
+
+[tasks.build]
+description = "Build the release binary"
+run = "mbx build --release --locked"
+
+[tasks.e2e]
+description = "Verify installed completion and real Tab behavior in Bash, Fish and Zsh"
+run = ["mbx build --locked", "uv run --script tests/e2e/shell_completion.py target/debug/fpc"]
+
+[tasks.install]
+description = "Install fpc from the current checkout"
+# Select stable explicitly to avoid Cargo's implicit toolchain override warning
+# when rustup selects the toolchain from rust-toolchain.toml.
+run = "mbx +stable install --path . --locked"
+
+[tasks.setup]
+description = "Initialize the local development environment"
+run = "hk install --mise"
+
+[tasks.hooks-check]
+description = "Run lightweight hook checks without installing hooks"
+run = "hk check --all"
+
+[tasks.ci]
+description = "Run checks and tests"
+depends = ["check", "test", "e2e"]

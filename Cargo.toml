@@ -1,0 +1,20 @@
+[package]
+name = "fpc"
+version = "0.0.1"
+edition = "2024"
+description = "Pick files and directories and copy their absolute paths"
+license = "MIT"
+repository = "https://github.com/happy-proto/fpc"
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+clap = { version = "4.6.7", features = ["derive"] }
+clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
+crossterm = { version = "0.29.0", features = ["use-dev-tty"] }
+ignore = "0.4.33"
+nucleo-matcher = "0.3.1"
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"

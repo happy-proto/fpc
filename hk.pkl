@@ -1,0 +1,27 @@
+amends "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Config.pkl"
+
+local checks = new Mapping<String, Step> {
+  ["diff"] {
+    check = "git diff --check && git diff --cached --check"
+  }
+  ["rustfmt"] {
+    glob = List("**/*.rs", "Cargo.toml", "rust-toolchain.toml")
+    check = "cargo fmt --check"
+  }
+  ["test"] {
+    glob = List("**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml")
+    check = "mise run test"
+  }
+}
+
+hooks {
+  ["check"] {
+    steps = checks
+  }
+  ["pre-commit"] {
+    fix = false
+    stage = false
+    stash = "none"
+    steps = checks
+  }
+}
