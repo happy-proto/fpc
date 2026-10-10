@@ -126,7 +126,7 @@ def scenario(root, binary, ghostty, ssh, mode, filename):
     home.mkdir()
     target = directory / filename
     target.touch()
-    expected = os.fsencode(target.resolve())
+    expected = os.fsencode(target)
     done = directory / "done"
     release = directory / "release"
     output = directory / "fpc.stdout"
