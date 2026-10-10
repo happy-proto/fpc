@@ -1,7 +1,5 @@
 # Release runbook
 
-Successful builds of `main` replace the rolling nightly prerelease. `scripts/release_notes.py --nightly-commit <full-commit-sha>` generates its notes with the source commit and the complete current `Unreleased` section, excluding older releases and changelog reference links. Changes accumulate until a stable release moves them into its versioned section; nightly notes do not display the Cargo package version.
-
 ## Prepare
 
 1. Create a release branch from `main` and choose a [semantic version](https://semver.org/spec/v2.0.0.html). The first release is `0.0.1`.
