@@ -2,6 +2,7 @@ name: Release
 
 on:
   pull_request:
+  merge_group:
   workflow_dispatch:
   push:
     branches:
@@ -156,6 +157,19 @@ jobs:
           name: binary-${{ matrix.target }}
           path: dist/*.txz
           if-no-files-found: error
+
+  required:
+    name: Release required
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [prepare, build]
+    if: always()
+    steps:
+      - name: Require package validation and all release builds to pass
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: test "$PREPARE_RESULT" = success && test "$BUILD_RESULT" = success
 
   publish:
     needs: [prepare, build]
