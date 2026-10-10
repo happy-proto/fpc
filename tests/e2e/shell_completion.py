@@ -217,17 +217,7 @@ def main():
     shells = arguments.shell or ["bash", "fish", "zsh"]
     completion_framework = None
     if "bash" in shells:
-        try:
-            completion_framework = framework()
-        except AssertionError as error:
-            ci = os.environ.get("CI", "").lower() not in ["", "0", "false"]
-            if ci or arguments.shell:
-                raise SystemExit(str(error)) from error
-            print(
-                f"Skipping Bash completion: {error}. Fish and Zsh will still run.",
-                file=sys.stderr,
-            )
-            shells = [shell for shell in shells if shell != "bash"]
+        completion_framework = framework()
     for shell in shells:
         executable = shutil.which(shell)
         assert executable, f"Required shell is missing: {shell}"
