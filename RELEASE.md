@@ -1,6 +1,14 @@
 # Release runbook
 
-Use this procedure for each stable release. Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html); published versions, tags, and release assets are immutable.
+Use this procedure for each stable release. Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html); published stable versions, tags, and release assets are immutable. Development builds use the separate rolling `nightly` prerelease described below.
+
+## Nightly builds
+
+Every push to `main` validates the package and builds Linux AMD64/ARM64 and macOS AMD64/ARM64 archives. Only after all four builds and archive checks succeed does the workflow update the separate `nightly` tag and recreate its GitHub prerelease. Recreating the release refreshes its publication date; it is always a prerelease and never becomes GitHub's latest stable release.
+
+Nightly notes identify the exact source commit, the current Cargo development version, and the maintained `Unreleased` changelog entries. Nightly archives use `fpc-<target>-nightly.tar.gz` and contain the executable, LICENSE, and a `revision.txt` file with the full commit SHA. The executable retains its Cargo version; that value alone does not identify a nightly build. Use its release notes or `revision.txt` instead. Nightly builds do not publish a crate or claim to be a stable semantic version release.
+
+Main workflows run serially. Immediately before replacing a nightly release, the workflow checks the current remote `main` commit and skips obsolete builds. Failed builds leave the previous nightly release intact. Release deletion, tag movement, upload, and publication are separate GitHub operations, so replacement has a brief availability gap; a failed upload can leave a draft. Inspect the release, tag, and workflow artifacts before retrying. An obsolete run cannot be used to recover a newer main build: push a fix to `main` or rerun its current successful build. Pull requests and manual workflow dispatches validate and upload artifacts without publishing either channel.
 
 ## Prepare the release PR
 
@@ -25,7 +33,7 @@ Only proceed with explicit authorization to publish the prepared version.
    git push origin v<version>
    ```
 
-3. Watch the Release workflow. It validates the tag against `main`, packages Linux AMD64/ARM64 and macOS AMD64/ARM64 binaries, and publishes only after every build succeeds. Check the release contains all four archives, `SHA256SUMS`, maintained **Highlights**, and **GitHub-generated changes**.
+3. Watch the Release workflow. It requires the tag to equal `v<Cargo.toml version>` and validates the tagged commit against `main`, packages Linux AMD64/ARM64 and macOS AMD64/ARM64 binaries, and publishes only after every build succeeds. Check the release contains all four archives, `SHA256SUMS`, maintained **Highlights**, and **GitHub-generated changes**.
 4. From the same tagged checkout, run `cargo publish --dry-run --locked`, review the package, then run `cargo publish --locked` with the authorized crates.io account. Confirm the registry reports the intended version.
 
 ## Verify the published version
@@ -39,4 +47,4 @@ Only proceed with explicit authorization to publish the prepared version.
 
 - Fix preparation or build failures before publication. A failed build must not publish a complete release.
 - If publication fails, inspect the tag, workflow artifacts, GitHub release or draft, and crates.io before retrying. Retry only missing steps; do not assume a failed command made no changes.
-- Do not move a published tag, replace published assets, or reuse a published crate version. Ship corrections as a new version through the same procedure.
+- Do not move a published stable tag, replace its published assets, or reuse a published crate version. Ship corrections as a new version through the same procedure. Only the separate `nightly` channel is replaceable.

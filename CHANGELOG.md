@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fast PTY checks for clipboard output, picker selection and cancellation, ignore rules, and terminal restoration, without desktop or shell completion dependencies.
 - Native Ghostty acceptance checks using real SSH, tmux, and system clipboards on Linux and macOS.
 - Versioned four-platform release archives, checksums, cargo-binstall-compatible packaging, and combined maintained and generated release notes.
+- A rolling nightly prerelease rebuilt from successful main commits, with refreshed publication dates, exact revision information, and maintained Unreleased notes.
 - A release runbook covering version preparation, publication, installation verification, and partial failures.
 
 ### Changed
