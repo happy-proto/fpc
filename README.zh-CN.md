@@ -34,4 +34,8 @@ fpc --install-completion fish # 安装动态 Tab 补全，也支持 bash 和 zsh
 cargo install --path . --locked
 ```
 
+`fpc --version` 显示源码 commit 和构建信息；`fpc -V` 只输出包版本。源码有未提交改动时标记为 `dirty`。
+
+[nightly 预发布版本](https://github.com/happy-proto/fpc/releases/tag/nightly) 跟随 `main` 的成功构建更新。正式版本只通过匹配版本号的 tag 发布。
+
 贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)，发布流程见 [RELEASE.md](RELEASE.md)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。

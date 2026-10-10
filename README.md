@@ -34,4 +34,8 @@ Local sessions use the system clipboard; SSH uses terminal clipboard support (OS
 cargo install --path . --locked
 ```
 
+`fpc --version` shows the source commit and build information; `fpc -V` prints only the package version. Uncommitted source changes are marked `dirty`.
+
+The [nightly prerelease](https://github.com/happy-proto/fpc/releases/tag/nightly) tracks successful builds of `main`. Stable releases are published only from matching version tags.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions, [RELEASE.md](RELEASE.md) for the release procedure, and [CHANGELOG.md](CHANGELOG.md) for changes.
