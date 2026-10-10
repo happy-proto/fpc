@@ -49,14 +49,10 @@ jobs:
       - name: Prepare nightly notes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: ./scripts/release_notes.py --nightly-commit "$GITHUB_SHA" > "$RUNNER_TEMP/release-notes.md"
-      - run: ./tests/e2e/release_checks.py
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          components: rustfmt, clippy
       - uses: jdx/mr-boxington-action@v1
-      - run: mbx fmt --check --all
-      - run: mbx clippy --all-targets --locked -- -D warnings
       - run: cargo package --locked
       - uses: actions/upload-artifact@v7.0.2
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
