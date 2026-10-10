@@ -47,18 +47,7 @@ jobs:
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Prepare nightly notes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          {
-            printf '# Nightly build\n\nCommit: %s\n\n' "$GITHUB_SHA"
-            printf '## Unreleased changes\n\n'
-            awk '
-              /^## \[Unreleased\]$/ { found = 1; next }
-              found && /^## \[/ { exit }
-              found && /^\[[^]]+\]:/ { exit }
-              found { print }
-              END { if (!found) exit 1 }
-            ' CHANGELOG.md
-          } > "$RUNNER_TEMP/release-notes.md"
+        run: ./scripts/release_notes.py --nightly-commit "$GITHUB_SHA" > "$RUNNER_TEMP/release-notes.md"
       - run: ./tests/e2e/release_checks.py
       - uses: dtolnay/rust-toolchain@stable
         with:

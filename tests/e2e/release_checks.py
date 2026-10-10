@@ -7,6 +7,7 @@
 # ]
 # ///
 
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -124,7 +125,68 @@ def main() -> None:
                     result.stdout
                     == "## Highlights\n\n### Added\n\n- First release.\n\n## GitHub-generated changes\n\n"
                 ), result.stdout
+        commit = "0123456789abcdef" * 2 + "01234567"
+        changes = "### Added\n\n- First nightly change.\n- Second nightly change.\n\n### Fixed\n\n- Later fix."
+        nightly_changelog = changelog.replace(
+            "## [Unreleased]\n", f"## [Unreleased]\n\n{changes}\n"
+        )
+        nightly_cases = [
+            ("cumulative nightly", nightly_changelog, commit, [], changes, None),
+            ("empty unreleased", changelog, commit, [], "", None),
+            (
+                "initial nightly",
+                f"## [Unreleased]\n\n{changes}\n\n[Unreleased]: https://example.com\n",
+                commit,
+                [],
+                changes,
+                None,
+            ),
+            ("missing unreleased", "# Changelog\n", commit, [], "", "Unreleased"),
+            (
+                "duplicate unreleased",
+                nightly_changelog + "\n## [Unreleased]\n",
+                commit,
+                [],
+                "",
+                "exactly one",
+            ),
+            ("short commit", changelog, "0123456", [], "", "40"),
+            ("invalid commit", changelog, "z" * 40, [], "", "hexadecimal"),
+            ("tag and nightly", changelog, commit, ["v0.0.1"], "", "combined"),
+            (
+                "package check and nightly",
+                changelog,
+                commit,
+                ["--check-package"],
+                "",
+                "combined",
+            ),
+        ]
         (root / "Cargo.toml").write_text(manifest)
+        for name, content, revision, options, expected, error in nightly_cases:
+            (root / "CHANGELOG.md").write_text(content)
+            result = subprocess.run(
+                [
+                    str(script),
+                    "--nightly-commit",
+                    revision,
+                    "--root",
+                    str(root),
+                    *options,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if error:
+                assert result.returncode != 0 and error in result.stderr, (name, result)
+                assert not result.stdout, (name, result.stdout)
+            else:
+                assert result.returncode == 0 and not result.stderr, (name, result)
+                assert result.stdout == (
+                    f"# Nightly build\n\nCommit: {commit}\n\n"
+                    f"## Unreleased changes\n\n{expected}\n"
+                ), (name, result.stdout)
         (root / "CHANGELOG.md").unlink()
         result = subprocess.run(
             [
@@ -161,7 +223,18 @@ def main() -> None:
             check=False,
         )
         assert result.returncode != 0 and "must be named fpc" in result.stderr, result
-    print(f"Release validation: {len(cases) + 2} scenarios passed")
+        result = subprocess.run(
+            ["uv", "run", "--quiet", "--script", str(script), "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=os.environ | {"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+        )
+        assert result.returncode == 0 and not result.stderr, result
+        assert "--nightly-commit" in result.stdout, result.stdout
+        assert "FULL_COMMIT_SHA" in result.stdout, result.stdout
+        assert "cannot be combined" in result.stdout, result.stdout
+    print(f"Release validation: {len(cases) + len(nightly_cases) + 3} scenarios passed")
 
 
 if __name__ == "__main__":
