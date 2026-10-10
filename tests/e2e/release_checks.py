@@ -1,14 +1,24 @@
+#!/usr/bin/env -S uv run --script
+#
 # /// script
-# requires-python = ">=3.11"
-# dependencies = []
+# requires-python = ">=3.15"
+# dependencies = [
+#     "typer>=0.27.3",
+# ]
 # ///
 
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
+import typer
 
+app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
+
+
+@app.command(
+    help="Verify release validation with isolated package and changelog fixtures."
+)
 def main() -> None:
     script = Path(__file__).resolve().parents[2] / "scripts/release_notes.py"
     with tempfile.TemporaryDirectory(prefix="fpc-release-") as directory:
@@ -91,7 +101,16 @@ def main() -> None:
             (root / "Cargo.toml").write_text(cargo)
             (root / "CHANGELOG.md").write_text(changes)
             result = subprocess.run(
-                [sys.executable, str(script), tag, "--root", str(root)],
+                [
+                    "uv",
+                    "run",
+                    "--quiet",
+                    "--script",
+                    str(script),
+                    tag,
+                    "--root",
+                    str(root),
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -108,7 +127,16 @@ def main() -> None:
         (root / "Cargo.toml").write_text(manifest)
         (root / "CHANGELOG.md").unlink()
         result = subprocess.run(
-            [sys.executable, str(script), "--root", str(root), "--check-package"],
+            [
+                "uv",
+                "run",
+                "--quiet",
+                "--script",
+                str(script),
+                "--root",
+                str(root),
+                "--check-package",
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -118,7 +146,16 @@ def main() -> None:
             manifest.replace('name = "fpc"', 'name = "other"')
         )
         result = subprocess.run(
-            [sys.executable, str(script), "--root", str(root), "--check-package"],
+            [
+                "uv",
+                "run",
+                "--quiet",
+                "--script",
+                str(script),
+                "--root",
+                str(root),
+                "--check-package",
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -128,4 +165,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()

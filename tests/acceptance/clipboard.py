@@ -1,9 +1,12 @@
+#!/usr/bin/env -S uv run --script
+#
 # /// script
-# requires-python = ">=3.11"
-# dependencies = []
+# requires-python = ">=3.15"
+# dependencies = [
+#     "typer>=0.27.3",
+# ]
 # ///
 
-import argparse
 import contextlib
 import getpass
 import json
@@ -16,6 +19,11 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Annotated
+
+import typer
+
+app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
 
 def run(args, **kwargs):
@@ -212,24 +220,48 @@ def scenario(root, binary, ghostty, ssh, mode, filename):
                 )
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Real Ghostty/SSH/tmux clipboard acceptance"
-    )
-    parser.add_argument("binary", type=Path)
-    parser.add_argument("--allow-desktop", action="store_true")
-    parser.add_argument("--artifacts", type=Path)
-    args = parser.parse_args()
-    if os.environ.get("CI") != "true" and not args.allow_desktop:
-        parser.error(
+@app.command(
+    help="Verify actual clipboard writes through Ghostty, SSH, and tmux; requires a desktop and passwordless sudo for isolated sshd."
+)
+def main(
+    binary: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
+            help="Built native fpc executable to test.",
+        ),
+    ],
+    allow_desktop: Annotated[
+        bool,
+        typer.Option(
+            "--allow-desktop",
+            help="Allow opening Ghostty and replacing the system clipboard; required outside CI=true.",
+        ),
+    ] = False,
+    artifacts: Annotated[
+        Path | None,
+        typer.Option(
+            "--artifacts",
+            file_okay=False,
+            resolve_path=True,
+            help="Directory for terminal/sshd logs and environment details, including on failure.",
+        ),
+    ] = None,
+):
+    if os.environ.get("CI") != "true" and not allow_desktop:
+        raise typer.BadParameter(
             "This opens Ghostty and replaces the clipboard; use --allow-desktop explicitly"
         )
-    binary = args.binary.resolve(strict=True)
     ghostty = os.environ.get("GHOSTTY_BINARY") or shutil.which("ghostty")
     if not ghostty and platform.system() == "Darwin":
         ghostty = "/Applications/Ghostty.app/Contents/MacOS/ghostty"
     if not ghostty or not Path(ghostty).is_file():
-        parser.error("Set GHOSTTY_BINARY to the installed Ghostty executable")
+        raise typer.BadParameter(
+            "Set GHOSTTY_BINARY to the installed Ghostty executable"
+        )
     with tempfile.TemporaryDirectory(prefix="fpc-acceptance-") as temporary:
         root = Path(temporary)
         try:
@@ -239,14 +271,14 @@ def main():
                         root, binary, ghostty, ssh, mode, "路径 ' quoted ; $ space.txt"
                     )
         finally:
-            if args.artifacts:
-                args.artifacts.mkdir(parents=True, exist_ok=True)
+            if artifacts:
+                artifacts.mkdir(parents=True, exist_ok=True)
                 for path in root.rglob("*"):
                     if path.is_file() and path.suffix in (".log", ".stdout", ".stderr"):
-                        destination = args.artifacts / path.relative_to(root)
+                        destination = artifacts / path.relative_to(root)
                         destination.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(path, destination)
-                (args.artifacts / "environment.json").write_text(
+                (artifacts / "environment.json").write_text(
                     json.dumps(
                         {
                             "platform": platform.platform(),
@@ -258,4 +290,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    app()
