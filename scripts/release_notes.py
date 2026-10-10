@@ -20,22 +20,47 @@ app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 
 
-@app.command(help="Validate a release and extract its maintained notes.")
+def validate_commit(value: str | None) -> str | None:
+    """Reject abbreviated or malformed nightly commit IDs."""
+    if value is not None and not re.fullmatch(r"[0-9a-fA-F]{40}", value):
+        raise typer.BadParameter("Use a full 40-character hexadecimal commit ID")
+    return value
+
+
+def section_notes(changelog: str, headings: list[re.Match[str]], index: int) -> str:
+    """Extract one section without later versions or reference links."""
+    start = headings[index].end()
+    end = headings[index + 1].start() if index + 1 < len(headings) else len(changelog)
+    return re.split(
+        r"^\[[^\]]+\]:", changelog[start:end], maxsplit=1, flags=re.MULTILINE
+    )[0].strip()
+
+
+@app.command(help="Validate the package and generate stable or nightly release notes.")
 def main(
     tag: Annotated[
         str | None,
         typer.Argument(
             metavar="vVERSION",
-            help="Release tag matching Cargo's stable semantic version; required unless --check-package is used.",
+            help="Release tag matching Cargo's stable semantic version; required unless --check-package or --nightly-commit is used.",
         ),
     ] = None,
     check_package: Annotated[
         bool,
         typer.Option(
             "--check-package",
-            help="Validate package identity and version without released notes; cannot be combined with a tag.",
+            help="Validate package identity and version without release notes; cannot be combined with a tag or --nightly-commit.",
         ),
     ] = False,
+    nightly_commit: Annotated[
+        str | None,
+        typer.Option(
+            "--nightly-commit",
+            metavar="FULL_COMMIT_SHA",
+            callback=validate_commit,
+            help="Generate nightly notes for a full 40-character hexadecimal commit ID using all Unreleased changes; cannot be combined with a tag or --check-package.",
+        ),
+    ] = None,
     root: Annotated[
         Path,
         typer.Option(
@@ -47,6 +72,10 @@ def main(
         ),
     ] = DEFAULT_ROOT,
 ) -> None:
+    if nightly_commit is not None and (tag is not None or check_package):
+        raise typer.BadParameter(
+            "--nightly-commit cannot be combined with a release tag or --check-package"
+        )
     package = tomllib.loads((root / "Cargo.toml").read_text())["package"]
     version = package["version"]
     if not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version):
@@ -60,12 +89,21 @@ def main(
             )
         print(f"Package ready for release preparation: fpc {version}")
         return
-    if tag != f"v{version}":
+    if nightly_commit is None and tag != f"v{version}":
         raise ValueError(f"Tag {tag!r} does not match Cargo version {version}")
     changelog = (root / "CHANGELOG.md").read_text()
     headings = list(re.finditer(r"^## \[([^\]]+)\](.*)$", changelog, re.MULTILINE))
     if not headings or headings[0][1] != "Unreleased":
         raise ValueError("The changelog must start with an Unreleased section")
+    if sum(heading[1] == "Unreleased" for heading in headings) != 1:
+        raise ValueError("Expected exactly one Unreleased changelog section")
+    if nightly_commit is not None:
+        notes = section_notes(changelog, headings, 0)
+        print(
+            f"# Nightly build\n\nCommit: {nightly_commit}\n\n"
+            f"## Unreleased changes\n\n{notes}"
+        )
+        return
     matches = [heading for heading in headings if heading[1] == version]
     if len(matches) != 1:
         raise ValueError(f"Expected exactly one changelog section for {version}")
@@ -80,10 +118,7 @@ def main(
     date = datetime.date.fromisoformat(date_match[1])
     if date > datetime.datetime.now(datetime.UTC).date():
         raise ValueError("The release date cannot be in the future")
-    following = [item.start() for item in headings if item.start() > heading.start()]
-    end = following[0] if following else len(changelog)
-    notes = changelog[heading.end() : end]
-    notes = re.split(r"^\[[^\]]+\]:", notes, maxsplit=1, flags=re.MULTILINE)[0].strip()
+    notes = section_notes(changelog, headings, headings.index(heading))
     if not re.search(
         r"^### (Added|Changed|Deprecated|Removed|Fixed|Security)$", notes, re.MULTILINE
     ):

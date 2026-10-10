@@ -2,6 +2,7 @@ name: Terminal acceptance
 
 on:
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -79,3 +80,15 @@ jobs:
           name: terminal-acceptance-${{ matrix.os }}
           path: acceptance-artifacts
           if-no-files-found: ignore
+
+  required:
+    name: Terminal acceptance required
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: clipboard
+    if: always()
+    steps:
+      - name: Require all terminal acceptance checks to pass
+        env:
+          RESULT: ${{ needs.clipboard.result }}
+        run: test "$RESULT" = success

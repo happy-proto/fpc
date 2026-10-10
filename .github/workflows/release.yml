@@ -2,6 +2,7 @@ name: Release
 
 on:
   pull_request:
+  merge_group:
   workflow_dispatch:
   push:
     branches:
@@ -21,7 +22,7 @@ defaults:
 
 concurrency:
   group: release-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 jobs:
   prepare:
@@ -47,28 +48,11 @@ jobs:
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Prepare nightly notes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fpc") | .version')"
-          {
-            printf '# Nightly build\n\nCommit:\n\n%s\n\n' "$GITHUB_SHA"
-            printf 'Development build from main. Cargo version:\n\n%s\n\nThis is not a stable versioned release.\n\n' "$version"
-            printf '## Unreleased changes\n\n'
-            awk '
-              /^## \[Unreleased\]$/ { found = 1; next }
-              found && /^## \[/ { exit }
-              found && /^\[[^]]+\]:/ { exit }
-              found { print }
-              END { if (!found) exit 1 }
-            ' CHANGELOG.md
-          } > "$RUNNER_TEMP/release-notes.md"
-      - run: ./tests/e2e/release_checks.py
+        run: ./scripts/release_notes.py --nightly-commit "$GITHUB_SHA" > "$RUNNER_TEMP/release-notes.md"
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          components: rustfmt, clippy
       - uses: jdx/mr-boxington-action@v1
-      - run: mbx fmt --check --all
-      - run: mbx clippy --all-targets --locked -- -D warnings
       - run: cargo package --locked
       - uses: actions/upload-artifact@v7.0.2
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -90,8 +74,6 @@ jobs:
             target: x86_64-unknown-linux-musl
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
           - os: macos-15
             target: aarch64-apple-darwin
     steps:
@@ -110,17 +92,12 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
       - uses: jdx/mr-boxington-action@v1
-        if: runner.os != 'macOS' || runner.arch != 'X64'
       - name: Test and build release binary
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          build_tool=mbx
-          if [ "$RUNNER_OS" = macOS ] && [ "$RUNNER_ARCH" = X64 ]; then
-            build_tool=cargo
-          fi
-          "$build_tool" test --locked --target "$TARGET"
-          "$build_tool" build --release --locked --target "$TARGET"
+          mbx test --locked --target "$TARGET"
+          mbx build --release --locked --target "$TARGET"
       - name: Verify binary runtime dependencies
         env:
           TARGET: ${{ matrix.target }}
@@ -170,6 +147,19 @@ jobs:
           path: dist/*.txz
           if-no-files-found: error
 
+  required:
+    name: Release required
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [prepare, build]
+    if: always()
+    steps:
+      - name: Require package validation and all release builds to pass
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: test "$PREPARE_RESULT" = success && test "$BUILD_RESULT" = success
+
   publish:
     needs: [prepare, build]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -190,7 +180,7 @@ jobs:
           name: release-notes
       - name: Verify artifacts
         run: |
-          test "$(find dist -name '*.txz' | wc -l)" -eq 4
+          test "$(find dist -name '*.txz' | wc -l)" -eq 3
           (cd dist && sha256sum ./*.txz > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
       - name: Publish a new stable release
