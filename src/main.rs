@@ -11,11 +11,36 @@ use std::{
     path::PathBuf,
 };
 
+shadow_rs::shadow!(build);
+
+const COMMIT: &str = if build::COMMIT_HASH.is_empty() {
+    "unknown"
+} else {
+    build::COMMIT_HASH
+};
+const MODIFIED: &str = if build::COMMIT_HASH.is_empty() || build::GIT_CLEAN {
+    ""
+} else {
+    " (modified)"
+};
+const LONG_VERSION: &str = shadow_rs::formatcp!(
+    "{}\nCommit: {}{}\nBuilt: {}\nTarget: {}\nRust: {}\n\n{}",
+    build::PKG_VERSION,
+    COMMIT,
+    MODIFIED,
+    build::BUILD_TIME_3339,
+    build::BUILD_TARGET,
+    build::RUST_VERSION,
+    env!("CARGO_PKG_REPOSITORY")
+);
+
 #[derive(Debug, Parser)]
 #[command(
     name = "fpc",
     version,
-    about = "Pick a file or directory and copy its absolute path"
+    long_version = LONG_VERSION,
+    about = "Pick a file or directory and copy its absolute path",
+    after_help = env!("CARGO_PKG_REPOSITORY")
 )]
 struct Cli {
     /// File or directory to copy; omit to open the fuzzy picker

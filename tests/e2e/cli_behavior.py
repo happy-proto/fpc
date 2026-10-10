@@ -8,6 +8,7 @@
 # ///
 
 import base64
+import datetime
 import errno
 import fcntl
 import os
@@ -19,6 +20,7 @@ import subprocess
 import tempfile
 import termios
 import time
+import tomllib
 from pathlib import Path
 from typing import Annotated
 
@@ -207,6 +209,35 @@ def verify_picker(binary, root):
     assert output.stderr, output
 
 
+def verify_build_information(binary):
+    package = tomllib.loads(
+        (Path(__file__).resolve().parents[2] / "Cargo.toml").read_text()
+    )["package"]
+    result = subprocess.run(
+        [str(binary), "--version"], capture_output=True, text=True, check=True
+    )
+    lines = result.stdout.splitlines()
+    assert not result.stderr and lines[0] == f"fpc {package['version']}", result
+    fields = dict(line.split(": ", 1) for line in lines[1:] if ": " in line)
+    commit = fields["Commit"].removesuffix(" (modified)")
+    assert commit == "unknown" or (
+        len(commit) == 40
+        and all(character in "0123456789abcdef" for character in commit)
+    ), fields
+    assert datetime.datetime.fromisoformat(fields["Built"]).tzinfo is not None, fields
+    assert fields["Target"] and fields["Rust"].startswith("rustc "), fields
+    assert package["repository"] in lines, lines
+    short = subprocess.run(
+        [str(binary), "-V"], capture_output=True, text=True, check=True
+    )
+    assert short.stdout == lines[0] + "\n" and not short.stderr, short
+    help_output = subprocess.run(
+        [str(binary), "--help"], capture_output=True, text=True, check=True
+    )
+    assert package["repository"] in help_output.stdout.splitlines(), help_output
+    assert not help_output.stderr, help_output
+
+
 @app.command(help="Verify picker and remote clipboard behavior through isolated PTYs.")
 def main(
     binary: Annotated[
@@ -221,6 +252,7 @@ def main(
     ],
 ):
     started = time.monotonic()
+    verify_build_information(binary)
     with tempfile.TemporaryDirectory(prefix="fpc-behavior-") as temporary:
         root = Path(temporary).resolve()
         remote = root / "remote"
