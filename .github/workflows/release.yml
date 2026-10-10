@@ -22,7 +22,7 @@ defaults:
 
 concurrency:
   group: release-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 jobs:
   prepare:
