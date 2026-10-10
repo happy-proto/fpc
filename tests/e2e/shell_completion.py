@@ -261,7 +261,7 @@ def verify(shell, executable, binary, completion_framework):
                 (".e", work / ".env"),
                 ("-- --r", work / "--report"),
                 (f"{work}/sam", work / "sample.txt"),
-                ("../work/sam", work / "sample.txt"),
+                ("../work/sam", work / "../work/sample.txt"),
             ]:
                 terminal.send(f"fpc --print {typed}\t\r")
                 output = terminal.wait_for(str(expected) + "\n")
