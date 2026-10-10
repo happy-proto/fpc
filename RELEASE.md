@@ -1,50 +1,24 @@
 # Release runbook
 
-Use this procedure for each stable release. Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html); published stable versions, tags, and release assets are immutable. Development builds use the separate rolling `nightly` prerelease described below.
+## Prepare
 
-## Nightly builds
-
-Every push to `main` validates the package and builds Linux AMD64/ARM64 and macOS AMD64/ARM64 archives. Only after all four builds and archive checks succeed does the workflow update the separate `nightly` tag and recreate its GitHub prerelease. Recreating the release refreshes its publication date; it is always a prerelease and never becomes GitHub's latest stable release.
-
-Nightly notes identify the exact source commit, the current Cargo development version, and the maintained `Unreleased` changelog entries. Nightly archives use `fpc-<target>-nightly.tar.gz` and contain the executable, LICENSE, and a `revision.txt` file with the full commit SHA. The executable retains its Cargo version; that value alone does not identify a nightly build. Use its release notes or `revision.txt` instead. Nightly builds do not publish a crate or claim to be a stable semantic version release.
-
-Main workflows run serially. Immediately before replacing a nightly release, the workflow checks the current remote `main` commit and skips obsolete builds. Failed builds leave the previous nightly release intact. Release deletion, tag movement, upload, and publication are separate GitHub operations, so replacement has a brief availability gap; a failed upload can leave a draft. Inspect the release, tag, and workflow artifacts before retrying. An obsolete run cannot be used to recover a newer main build: push a fix to `main` or rerun its current successful build. Pull requests and manual workflow dispatches validate and upload artifacts without publishing either channel.
-
-## Prepare the release PR
-
-1. Start a release branch from the current `main`. Review changes since the previous release and choose the next version; the first release is `0.0.1`.
-2. Set the version with `cargo set-version <version>` when it changes, then run `cargo check` to update the lockfile. Do not edit version fields or the lockfile manually.
-3. Move the relevant `Unreleased` entries in `CHANGELOG.md` into `## [<version>] - YYYY-MM-DD`, using the actual planned publication date. Keep an `Unreleased` section above it and omit empty categories. Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-4. Link the version heading to its GitHub release. Update the `Unreleased` link to compare the new tag against `HEAD`; for later versions, include a comparison with the preceding tag.
-5. Review installation instructions and both README files when behavior or supported platforms change. Run `mise run check`, `mise run test`, `cargo package --locked`, and `./scripts/release_notes.py v<version>`.
-6. Open an English PR to `main`. Require the fast checks, complete shell tests, native Ghostty clipboard acceptance on Linux and macOS, and all four release archive builds to pass. Inspect the artifacts and resolve failures before squash-merging.
-
-The PR and manual Release workflow only build and upload artifacts. They do not publish. `scripts/release_notes.py` validates the tag/version/date/link agreement and extracts the maintained notes; an `Unreleased`-only changelog intentionally fails release validation.
+1. Create a release branch from `main` and choose a [semantic version](https://semver.org/spec/v2.0.0.html). The first release is `0.0.1`.
+2. Update the package version with `cargo set-version <version>` if needed, then run `cargo check` to refresh the lockfile.
+3. Review `Unreleased` in [CHANGELOG.md](CHANGELOG.md). Move the release's changes into `## [<version>] - YYYY-MM-DD` using the publication date, retain an empty `Unreleased` section, and update the release/comparison links. Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+4. Run `mise run ci`, `cargo package --locked`, and `./scripts/release_notes.py v<version>`. Review the extracted highlights and update both README files if usage changed.
+5. Open an English PR, wait for all checks to pass, and squash-merge it into `main`.
 
 ## Publish
 
-Only proceed with explicit authorization to publish the prepared version.
-
-1. Refresh `main` and check that the intended release commit and its checks are the accepted ones. Confirm the date, Cargo version, tag, and maintained notes still agree. If preparation changed, use another PR before tagging.
-2. Create and push the annotated tag from that accepted commit:
+1. Confirm the accepted commit, Cargo version, changelog, and date. Create and push the matching annotated tag:
 
    ```sh
    git tag -a v<version> <accepted-commit> -m "Release v<version>"
    git push origin v<version>
    ```
 
-3. Watch the Release workflow. It requires the tag to equal `v<Cargo.toml version>` and validates the tagged commit against `main`, packages Linux AMD64/ARM64 and macOS AMD64/ARM64 binaries, and publishes only after every build succeeds. Check the release contains all four archives, `SHA256SUMS`, maintained **Highlights**, and **GitHub-generated changes**.
-4. From the same tagged checkout, run `cargo publish --dry-run --locked`, review the package, then run `cargo publish --locked` with the authorized crates.io account. Confirm the registry reports the intended version.
+2. Wait for the Release workflow to finish. Review the published assets and notes: the version's maintained changelog is followed by GitHub's generated changes since the previous stable release. CI extracts these notes; maintainers write the changelog before tagging.
+3. From the tagged checkout, run `cargo publish --dry-run --locked`, inspect the package, then run `cargo publish --locked`. Confirm the intended version appears on crates.io.
+4. Verify installation with `cargo binstall fpc --version <version> --no-confirm` and `cargo install fpc --version <version> --locked` in isolated installation directories. Check the binary's version and a representative copy operation. After the first crates.io publication, add its badges to both README files.
 
-## Verify the published version
-
-1. Download the archives and verify `SHA256SUMS`. Check the executable version and exercise a representative copy operation on supported platforms.
-2. In an isolated installation directory, verify `cargo binstall fpc --version <version> --no-confirm --install-path <directory>` installs the release archive rather than falling back to a source build. Verify its version and basic behavior.
-3. Verify `cargo install fpc --version <version> --locked --root <directory>` works from crates.io. After the first successful publication, add crates.io badges to both README files through a normal PR.
-4. Confirm `Unreleased` is ready to record subsequent changes.
-
-## Handle a failed or partial release
-
-- Fix preparation or build failures before publication. A failed build must not publish a complete release.
-- If publication fails, inspect the tag, workflow artifacts, GitHub release or draft, and crates.io before retrying. Retry only missing steps; do not assume a failed command made no changes.
-- Do not move a published stable tag, replace its published assets, or reuse a published crate version. Ship corrections as a new version through the same procedure. Only the separate `nightly` channel is replaceable.
+If a step fails, inspect the existing release, draft, tag, artifacts, and registry before retrying only missing steps. Never move a published stable tag, replace its assets, or reuse a crate version; publish corrections as a new version.
