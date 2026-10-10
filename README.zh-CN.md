@@ -34,4 +34,4 @@ fpc --install-completion fish # 安装动态 Tab 补全，也支持 bash 和 zsh
 cargo install --path . --locked
 ```
 
-贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)，维护和发布规范见 [MAINTAINING.md](MAINTAINING.md)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)，发布流程见 [RELEASE.md](RELEASE.md)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。

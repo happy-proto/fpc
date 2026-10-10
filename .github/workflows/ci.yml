@@ -50,6 +50,8 @@ jobs:
       - name: Shell completion E2E
         run: |
           mbx build --locked
+          python3 tests/e2e/cli_behavior.py target/debug/fpc
+          python3 tests/e2e/release_checks.py
           python3 tests/e2e/shell_completion.py target/debug/fpc
 
   required:

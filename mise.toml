@@ -7,15 +7,15 @@ description = "Check formatting and lint all targets"
 run = ["cargo fmt --check", "mbx clippy --all-targets --locked -- -D warnings"]
 
 [tasks.test]
-description = "Run the test suite"
-run = "mbx test --locked"
+description = "Run fast tests without desktop or shell framework dependencies"
+run = ["mbx test --locked", "uv run --script tests/e2e/cli_behavior.py target/debug/fpc", "uv run --script tests/e2e/release_checks.py"]
 
 [tasks.build]
 description = "Build the release binary"
 run = "mbx build --release --locked"
 
 [tasks.e2e]
-description = "Verify installed completion and real Tab behavior in Bash, Fish and Zsh"
+description = "Run complete shell completion tests in an environment prepared like CI"
 run = ["mbx build --locked", "uv run --script tests/e2e/shell_completion.py target/debug/fpc"]
 
 [tasks.install]
@@ -33,5 +33,9 @@ description = "Run lightweight hook checks without installing hooks"
 run = "hk check --all"
 
 [tasks.ci]
-description = "Run checks and tests"
-depends = ["check", "test", "e2e"]
+description = "Run local checks and fast tests"
+depends = ["check", "test"]
+
+[tasks.acceptance]
+description = "Run native desktop clipboard acceptance explicitly"
+run = ["mbx build --locked", "uv run --script tests/acceptance/clipboard.py target/debug/fpc --allow-desktop"]

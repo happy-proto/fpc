@@ -9,15 +9,16 @@ The repository uses the stable Rust toolchain selected by [rust-toolchain.toml](
 ```sh
 mise run check
 mise run test
-mise run e2e
 ```
 
-`mise run check` runs `cargo fmt --check` and `mbx clippy --all-targets --locked -- -D warnings`; `mise run test` runs `mbx test --locked`. Use `mise run build` to build the release binary and `mise run install` to install it from this checkout. `mise run ci` runs checks, tests, and shell E2E together.
+`mise run check` runs formatting and Clippy. `mise run test` runs the Rust tests, fast PTY behavior tests, and release validation tests. These commands use the same test selection on every machine and do not require a GUI, SSH server, shell completion framework, or access to your clipboard. Use `mise run build` to build the release binary and `mise run install` to install it from this checkout. `mise run ci` runs the local checks and fast tests together.
 
 Test public behavior, edge cases, and regressions. When fixing a bug, first reproduce it with a failing test when practical. Clipboard tests should use isolated command stubs or terminal fixtures, rather than overwrite a contributor's real clipboard.
 
-Prefer CLI and shell integration tests over tests tied to internal helpers. `mise run e2e` requires Bash 4.2+, Fish, Zsh, bash-completion, and uv. It installs completion in temporary HOME/XDG directories, uses Fish's public `complete -C` interface for candidate checks, and sends real Tab keys through a pseudo-terminal to verify loading, navigation, and quoting. It executes `fpc --print` and leaves your clipboard and shell configuration untouched. Set `BASH_COMPLETION_FILE` to the framework's main script for a custom installation. CI runs this on Linux and macOS; missing prerequisites fail the check.
+Prefer CLI and shell integration tests over tests tied to internal helpers. CI installs Bash 4.2+, Fish, Zsh, and bash-completion, then always runs the complete shell suite on Linux and macOS. It uses temporary HOME/XDG directories and real Tab presses, executes `fpc --print`, and leaves the system clipboard untouched. Missing prerequisites fail the suite; no test is automatically skipped based on the host environment. `mise run e2e` is an explicit full-shell entry point for an environment prepared like CI; it is not part of the default local checks. `BASH_COMPLETION_FILE` can select the framework's main script explicitly.
 
-Record notable user-facing changes in the appropriate category under `Unreleased` in [CHANGELOG.md](CHANGELOG.md). Do not copy commit logs into it. See [MAINTAINING.md](MAINTAINING.md) for release policy.
+The Terminal acceptance workflow uses real Ghostty, OpenSSH, tmux, and the system clipboard on both operating systems. This is separate from the fast tests. `mise run acceptance` runs it explicitly in a prepared desktop environment and writes to that environment's clipboard; it is not part of local checks or hooks. CI keeps diagnostic artifacts when it fails.
 
-After `mise install`, run `mise run setup` once to initialize the local development environment. It currently installs repository-local Git hooks managed by hk; future development setup steps belong here. Run `mise run hooks-check` to check without installing hooks. Pre-commit checks whitespace, Rust formatting, and the Rust test suite when relevant files change. They check the working tree without fixing, staging, or stashing files. Cross-shell E2E remains in CI and `mise run e2e`.
+Record notable user-facing changes in the appropriate category under `Unreleased` in [CHANGELOG.md](CHANGELOG.md). Do not copy commit logs into it. Follow [RELEASE.md](RELEASE.md) when preparing and publishing a version.
+
+After `mise install`, run `mise run setup` once to initialize the local development environment. It currently installs repository-local Git hooks managed by hk; future development setup steps belong here. Run `mise run hooks-check` to check without installing hooks. Pre-commit checks whitespace, Rust formatting, and the fast test suite when relevant files change. They check the working tree without fixing, staging, or stashing files. Complete shell and desktop acceptance tests remain outside hooks.

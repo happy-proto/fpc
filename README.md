@@ -34,4 +34,4 @@ Local sessions use the system clipboard; SSH uses terminal clipboard support (OS
 cargo install --path . --locked
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions, [MAINTAINING.md](MAINTAINING.md) for release conventions, and [CHANGELOG.md](CHANGELOG.md) for changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions, [RELEASE.md](RELEASE.md) for the release procedure, and [CHANGELOG.md](CHANGELOG.md) for changes.

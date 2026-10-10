@@ -9,7 +9,7 @@ local checks = new Mapping<String, Step> {
     check = "cargo fmt --check"
   }
   ["test"] {
-    glob = List("**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml")
+    glob = List("**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "scripts/release_notes.py", "tests/e2e/cli_behavior.py", "tests/e2e/release_checks.py")
     check = "mise run test"
   }
 }
