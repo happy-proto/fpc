@@ -169,14 +169,16 @@ def scenario(root, binary, ghostty, ssh, mode, filename):
         remote = (
             f"env HOME={shlex.quote(str(home))} "
             f"XDG_CONFIG_HOME={shlex.quote(str(home / '.config'))} "
-            f"PATH={shlex.quote(os.environ['PATH'])} " + shlex.join(command)
+            f"PATH={shlex.quote(os.environ['PATH'])} "
+            + shlex.join(command)
+            + f" 2>{shlex.quote(str(directory / 'session.stderr'))}"
         )
         command = [*ssh, remote]
     config = directory / "ghostty.config"
     config.write_text(
         "clipboard-write = allow\nclipboard-read = deny\nshell-integration = none\n"
         "confirm-close-surface = false\nquit-after-last-window-closed = true\n"
-        "window-save-state = never\n"
+        "window-save-state = never\nterm = xterm-256color\n"
     )
     environment = os.environ.copy()
     for key in ("TMUX", "TMUX_PANE", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"):
