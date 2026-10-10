@@ -64,6 +64,8 @@ fn tab_completion_only_offers_paths_without_a_current_directory_entry() {
     }
     fs::create_dir(root.join("folder")).unwrap();
     fs::write(root.join("folder/nested.txt"), "").unwrap();
+    let empty = root.join("empty");
+    fs::create_dir(&empty).unwrap();
     for shell in ["fish", "bash", "zsh"] {
         for (prefix, expected) in [
             ("", "sample.txt"),
@@ -104,6 +106,16 @@ fn tab_completion_only_offers_paths_without_a_current_directory_entry() {
                 );
             }
         }
+        let output = cli(&empty)
+            .env("COMPLETE", shell)
+            .env("_CLAP_COMPLETE_INDEX", "1")
+            .args(["--", "fpc", ""])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success() && output.stdout.is_empty(),
+            "{shell}: {output:?}"
+        );
     }
     assert!(cli(root).arg("--help").output().unwrap().status.success());
 }
@@ -172,6 +184,14 @@ fn completion_install_is_idempotent_and_respects_config_locations() {
     assert!(
         !cli(root)
             .args(["--install-completion", "fish", "some-file"])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    assert!(
+        !cli(root)
+            .args(["--install-completion", "auto"])
             .output()
             .unwrap()
             .status

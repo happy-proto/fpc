@@ -141,9 +141,17 @@ def verify(shell, executable, binary, completion_framework):
             "XDG_DATA_DIRS": str(home / "system"),
             "BASH_COMPLETION_USER_DIR": str(home / "data/bash-completion"),
             "ZDOTDIR": str(home),
+            "SHELL": executable,
         }
         subprocess.run(
             [str(binary), "--install-completion", shell],
+            env=environment,
+            cwd=work,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            [str(binary), "--install-completion"],
             env=environment,
             cwd=work,
             check=True,
@@ -163,25 +171,24 @@ def verify(shell, executable, binary, completion_framework):
         else:
             command = [
                 executable,
-                "--no-config",
                 "--interactive",
                 "--init-command",
                 f"function fish_prompt; printf '%s' {shlex.quote(PROMPT)}; end; set -g fish_greeting; set -g fish_autosuggestion_enabled 0",
             ]
         terminal = Terminal(command, environment, work)
         try:
+            completion_work = work
 
             def menu_for(prefix):
                 if shell == "fish":
                     return subprocess.run(
                         [
                             executable,
-                            "--no-config",
                             "-c",
                             f"complete -C {shlex.quote('fpc ' + prefix)}",
                         ],
                         env=environment,
-                        cwd=work,
+                        cwd=completion_work,
                         check=True,
                         capture_output=True,
                         text=True,
@@ -202,6 +209,51 @@ def verify(shell, executable, binary, completion_framework):
                 assert option not in menu, (shell, menu)
             hidden = menu_for(".")
             assert ".env" in hidden, (shell, hidden)
+            option = menu_for("--re")
+            assert "--respect-ignore" in option, (shell, option)
+            shells = menu_for("--install-completion ")
+            for value in ["fish", "bash", "zsh"]:
+                assert value in shells, (shell, value, shells)
+            assert not re.search(r"(?:^|\s)auto(?:\s|$)", shells), (shell, shells)
+            assert "sample.txt" not in shells and "--help" not in shells, (
+                shell,
+                shells,
+            )
+            rules = menu_for("--ignore-file ")
+            assert "sample.txt" in rules and "folder" in rules, (shell, rules)
+            assert "--help" not in rules, (shell, rules)
+            escaped = menu_for("-- --r")
+            assert "--report" in escaped and "--respect-ignore" not in escaped, (
+                shell,
+                escaped,
+            )
+            empty = home / "empty"
+            empty.mkdir()
+            terminal.send(f"cd {shlex.quote(str(empty))}\r")
+            terminal.wait_for(PROMPT)
+            completion_work = empty
+            empty_menu = menu_for("")
+            assert (
+                "--help" not in empty_menu and "--respect-ignore" not in empty_menu
+            ), (shell, empty_menu)
+            terminal.send(f"cd {shlex.quote(str(work))}\r")
+            terminal.wait_for(PROMPT)
+            completion_work = work
+            terminal.send("fpc --install-completion fi\t\r")
+            destination = str(home / "config/fish/completions/fpc.fish")
+            output = terminal.wait_for(destination + "\n")
+            if PROMPT not in output.split(destination + "\n", 1)[1]:
+                terminal.wait_for(PROMPT)
+            for command in [
+                "fpc --print --re\t ./sample.txt\r",
+                "fpc --print --ignore-file sam\t ./sample.txt\r",
+            ]:
+                terminal.send(command)
+                expected = str(work / "sample.txt")
+                output = terminal.wait_for(expected + "\n")
+                assert expected in output.splitlines(), (shell, command, output)
+                if PROMPT not in output.split(expected + "\n", 1)[1]:
+                    terminal.wait_for(PROMPT)
             for typed, expected in [
                 ("sam", work / "sample.txt"),
                 ("folder/nes", work / "folder/nested.txt"),
@@ -219,7 +271,7 @@ def verify(shell, executable, binary, completion_framework):
         finally:
             terminal.close()
     print(
-        f"{shell}: real Tab, path-only menus, hidden paths, navigation and quoting passed ({time.monotonic() - started:.2f}s)"
+        f"{shell}: real Tab, contextual options and values, path menus, navigation and quoting passed ({time.monotonic() - started:.2f}s)"
     )
 
 
