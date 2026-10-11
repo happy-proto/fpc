@@ -11,16 +11,31 @@ When pointing an Agent at a file, paths outside the workspace or hidden by `.git
 
 ## Install
 
-Install or update to the latest [nightly prerelease](https://github.com/happy-proto/fpc/releases/tag/nightly) with [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
+Install the latest stable release with [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
+
+```sh
+cargo binstall fpc
+```
+
+No stable release has been published yet. This command becomes available after the first crates.io publication; for now, use nightly below.
+
+Prebuilt binaries are available for Linux on x86-64 and ARM64, and for macOS on ARM64.
+
+<details>
+<summary>Install or update to the latest nightly</summary>
+
+To use the latest [nightly prerelease](https://github.com/happy-proto/fpc/releases/tag/nightly), override the stable download paths:
 
 ```sh
 cargo binstall --git https://github.com/happy-proto/fpc \
   --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
   --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
-  --strategies crate-meta-data --force --no-confirm fpc
+  --strategies crate-meta-data --force fpc
 ```
 
-Prebuilt binaries are available for Linux on x86-64 and ARM64, and for macOS on ARM64. `--force` updates the nightly binary even when its Cargo package version has not changed.
+`--force` updates the nightly binary even when its Cargo package version has not changed. `--strategies crate-meta-data` requires a prebuilt binary. cargo-binstall has no `--nightly` option; `--version` accepts SemVer versions, not the `nightly` release tag.
+
+</details>
 
 On Intel Macs, build and install from source:
 

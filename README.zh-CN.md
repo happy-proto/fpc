@@ -11,16 +11,31 @@
 
 ## 安装
 
-使用 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 安装或更新到最新的 [nightly 预发布版本](https://github.com/happy-proto/fpc/releases/tag/nightly)：
+使用 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 安装最新正式版本：
+
+```sh
+cargo binstall fpc
+```
+
+目前尚未发布正式版本。首次发布到 crates.io 后即可使用此命令；现阶段请使用下面的 nightly 安装方式。
+
+提供 Linux 的 x86-64、ARM64 和 macOS 的 ARM64 预编译二进制。
+
+<details>
+<summary>安装或更新到最新 nightly</summary>
+
+安装最新的 [nightly 预发布版本](https://github.com/happy-proto/fpc/releases/tag/nightly) 时，覆盖正式版的下载路径：
 
 ```sh
 cargo binstall --git https://github.com/happy-proto/fpc \
   --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
   --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
-  --strategies crate-meta-data --force --no-confirm fpc
+  --strategies crate-meta-data --force fpc
 ```
 
-提供 Linux 的 x86-64、ARM64 和 macOS 的 ARM64 预编译二进制。`--force` 确保 Cargo 包版本未变化时也能更新 nightly 二进制。
+`--force` 确保 Cargo 包版本未变化时也能更新 nightly 二进制。`--strategies crate-meta-data` 要求使用预编译二进制。cargo-binstall 没有 `--nightly` 选项；`--version` 接受 SemVer 版本号，不接受 `nightly` release tag。
+
+</details>
 
 Intel Mac 可以从源码构建安装：
 
