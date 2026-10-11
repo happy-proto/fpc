@@ -17,7 +17,7 @@ Install the latest stable release with [cargo-binstall](https://github.com/cargo
 cargo binstall fpc
 ```
 
-No stable release has been published yet. This command becomes available after the first crates.io publication; for now, use nightly below.
+The first functional release is 0.0.1. Version 0.0.0 is an empty bootstrap crate used to configure Trusted Publishing and contains no CLI. Until 0.0.1 is published, use nightly below.
 
 Prebuilt binaries are available for Linux on x86-64 and ARM64, and for macOS on ARM64.
 

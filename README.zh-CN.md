@@ -17,7 +17,7 @@
 cargo binstall fpc
 ```
 
-目前尚未发布正式版本。首次发布到 crates.io 后即可使用此命令；现阶段请使用下面的 nightly 安装方式。
+首个可用版本是 0.0.1。0.0.0 是用于配置 Trusted Publishing 的空初始化 crate，不包含 CLI。0.0.1 发布前，请使用下面的 nightly 安装方式。
 
 提供 Linux 的 x86-64、ARM64 和 macOS 的 ARM64 预编译二进制。
 
