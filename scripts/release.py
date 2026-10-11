@@ -149,7 +149,7 @@ def main(
     link = f"{package['repository']}/releases/tag/{tag}"
     if f"[{version}]: {link}" not in changelog.splitlines():
         raise ValueError("The changelog version link must point to this GitHub release")
-    print(f"## Highlights\n\n{notes}\n\n## GitHub-generated changes\n")
+    print(f"## Highlights\n\n{notes}")
 
 
 if __name__ == "__main__":

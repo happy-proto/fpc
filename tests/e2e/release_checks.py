@@ -180,8 +180,7 @@ def main() -> None:
             else:
                 assert result.returncode == 0 and not result.stderr, (name, result)
                 assert (
-                    result.stdout
-                    == "## Highlights\n\n### Added\n\n- First release.\n\n## GitHub-generated changes\n\n"
+                    result.stdout == "## Highlights\n\n### Added\n\n- First release.\n"
                 ), result.stdout
         commit = "0123456789abcdef" * 2 + "01234567"
         changes = "### Added\n\n- First nightly change.\n- Second nightly change.\n\n### Fixed\n\n- Later fix."
