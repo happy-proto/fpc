@@ -17,9 +17,8 @@
    git push origin v<version>
    ```
 
-2. Wait for the Release workflow to finish, including **Publish to crates.io**. Review the published GitHub release, assets, and notes.
+2. Wait for the Release workflow to finish. Review the published GitHub release, assets, and notes.
 3. Confirm the intended version appears on crates.io.
-4. Verify installation with `cargo binstall fpc --version <version> --no-confirm` and `cargo install fpc --version <version> --locked` in isolated installation directories. Check the binary's version and a representative copy operation. After the first crates.io publication, add its badges to both README files.
 
 If a step fails, inspect the existing release, draft, tag, artifacts, and registry before retrying only missing steps. Never move a published stable tag, replace its assets, or reuse a crate version; publish corrections as a new version.
 
