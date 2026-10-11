@@ -21,7 +21,7 @@ app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
     help="Verify release validation with isolated package and changelog fixtures."
 )
 def main() -> None:
-    script = Path(__file__).resolve().parents[2] / "scripts/release_notes.py"
+    script = Path(__file__).resolve().parents[2] / "scripts/release.py"
     with tempfile.TemporaryDirectory(prefix="fpc-release-") as directory:
         root = Path(directory)
         manifest = '[package]\nname = "fpc"\nversion = "0.0.1"\nrepository = "https://github.com/happy-proto/fpc"\n'
@@ -47,6 +47,64 @@ def main() -> None:
         cases = [
             ("valid release", "v0.0.1", manifest, changelog, None),
             ("tag mismatch", "v0.0.2", manifest, changelog, "does not match"),
+            (
+                "version comparison is numeric",
+                "v0.0.10",
+                manifest.replace('"0.0.1"', '"0.0.10"'),
+                changelog.replace("0.0.1", "0.0.10").replace("0.0.0", "0.0.9"),
+                None,
+            ),
+            ("tag without prefix", "0.0.1", manifest, changelog, "vVERSION"),
+            (
+                "tag with leading zero",
+                "v0.0.01",
+                manifest,
+                changelog,
+                "stable semantic",
+            ),
+            (
+                "tag with incomplete version",
+                "v0.0",
+                manifest,
+                changelog,
+                "stable semantic",
+            ),
+            (
+                "unreleased changes",
+                "v0.0.1",
+                manifest,
+                changelog.replace(
+                    "## [Unreleased]\n",
+                    "## [Unreleased]\n\n### Added\n\n- Pending change.\n",
+                ),
+                "Unreleased section must be empty",
+            ),
+            (
+                "unreleased explanation",
+                "v0.0.1",
+                manifest,
+                changelog.replace(
+                    "## [Unreleased]\n",
+                    "## [Unreleased]\n\nDeferred until the next release.\n",
+                ),
+                "Unreleased section must be empty",
+            ),
+            (
+                "higher version later in changelog",
+                "v0.0.1",
+                manifest,
+                changelog.replace("[0.0.0]", "[0.0.2]"),
+                "newest version",
+            ),
+            (
+                "release section is not first",
+                "v0.0.1",
+                manifest,
+                changelog.replace("[0.0.1] - 2020", "[0.0.0] - 2020").replace(
+                    "[0.0.0] - 2019", "[0.0.1] - 2019"
+                ),
+                "newest version",
+            ),
             ("unreleased only", "v0.0.1", manifest, "## [Unreleased]\n", "exactly one"),
             (
                 "missing date",
