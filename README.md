@@ -1,6 +1,7 @@
 # fpc
 
 [![CI](https://github.com/happy-proto/fpc/actions/workflows/ci.yml/badge.svg)](https://github.com/happy-proto/fpc/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/fpc.svg)](https://crates.io/crates/fpc)
 [![Dependencies](https://deps.rs/repo/github/happy-proto/fpc/status.svg)](https://deps.rs/repo/github/happy-proto/fpc)
 
 [简体中文](README.zh-CN.md)
@@ -11,21 +12,10 @@ When pointing an Agent at a file, paths outside the workspace or hidden by `.git
 
 ## Install
 
-Install or update to the latest [nightly prerelease](https://github.com/happy-proto/fpc/releases/tag/nightly) with [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
+Install the latest stable release with [cargo-binstall](https://github.com/cargo-bins/cargo-binstall):
 
 ```sh
-cargo binstall --git https://github.com/happy-proto/fpc \
-  --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
-  --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
-  --strategies crate-meta-data --force --no-confirm fpc
-```
-
-Prebuilt binaries are available for Linux on x86-64 and ARM64, and for macOS on ARM64. `--force` updates the nightly binary even when its Cargo package version has not changed.
-
-On Intel Macs, build and install from source:
-
-```sh
-cargo install --git https://github.com/happy-proto/fpc --locked fpc
+cargo binstall fpc
 ```
 
 ## Usage

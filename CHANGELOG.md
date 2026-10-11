@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-10-11
+
 ### Added
 
 - Copy absolute file and directory paths directly or select them with an interactive fuzzy picker. Symbolic links retain their own paths, including dangling links.
@@ -15,4 +17,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dynamic Bash, Fish, and Zsh completion for paths, options, and shell names, with explicit installation into standalone files without editing shell startup files.
 - Detailed `--version` output with source commit, dirty state, and build information, plus a short `-V` form.
 
-[Unreleased]: https://github.com/happy-proto/fpc/commits/main/
+[Unreleased]: https://github.com/happy-proto/fpc/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/happy-proto/fpc/releases/tag/v0.0.1

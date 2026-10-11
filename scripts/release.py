@@ -3,6 +3,7 @@
 # /// script
 # requires-python = ">=3.15"
 # dependencies = [
+#     "semver>=3.1.0",
 #     "typer>=0.27.3",
 # ]
 # ///
@@ -14,10 +15,22 @@ import tomllib
 from pathlib import Path
 from typing import Annotated
 
+import semver
 import typer
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def stable_version(value: str) -> semver.Version:
+    """Parse the stable SemVer used by release tags and Cargo."""
+    try:
+        version = semver.Version.parse(value)
+    except ValueError as error:
+        raise ValueError("Releases require a stable semantic version") from error
+    if version.prerelease is not None or version.build is not None:
+        raise ValueError("Releases require a stable semantic version")
+    return version
 
 
 def validate_commit(value: str | None) -> str | None:
@@ -78,8 +91,7 @@ def main(
         )
     package = tomllib.loads((root / "Cargo.toml").read_text())["package"]
     version = package["version"]
-    if not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version):
-        raise ValueError("Releases require a stable semantic version")
+    parsed_version = stable_version(version)
     if package["name"] != "fpc":
         raise ValueError("The released crate and binary must be named fpc")
     if check_package:
@@ -89,8 +101,11 @@ def main(
             )
         print(f"Package ready for release preparation: fpc {version}")
         return
-    if nightly_commit is None and tag != f"v{version}":
-        raise ValueError(f"Tag {tag!r} does not match Cargo version {version}")
+    if nightly_commit is None:
+        if tag is None or not tag.startswith("v"):
+            raise ValueError("Release tags must use the vVERSION format")
+        if stable_version(tag.removeprefix("v")) != parsed_version:
+            raise ValueError(f"Tag {tag!r} does not match Cargo version {version}")
     changelog = (root / "CHANGELOG.md").read_text()
     headings = list(re.finditer(r"^## \[([^\]]+)\](.*)$", changelog, re.MULTILINE))
     if not headings or headings[0][1] != "Unreleased":
@@ -109,6 +124,12 @@ def main(
         raise ValueError(f"Expected exactly one changelog section for {version}")
     heading = matches[0]
     if headings.index(heading) != 1:
+        raise ValueError(
+            "The released version must be the newest version in the changelog"
+        )
+    if changelog[headings[0].end() : heading.start()].strip():
+        raise ValueError("The Unreleased section must be empty for a release")
+    if any(semver.Version.parse(item[1]) > parsed_version for item in headings[1:]):
         raise ValueError(
             "The released version must be the newest version in the changelog"
         )

@@ -1,6 +1,7 @@
 # fpc
 
 [![CI](https://github.com/happy-proto/fpc/actions/workflows/ci.yml/badge.svg)](https://github.com/happy-proto/fpc/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/fpc.svg)](https://crates.io/crates/fpc)
 [![Dependencies](https://deps.rs/repo/github/happy-proto/fpc/status.svg)](https://deps.rs/repo/github/happy-proto/fpc)
 
 [English](README.md)
@@ -11,21 +12,10 @@
 
 ## 安装
 
-使用 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 安装或更新到最新的 [nightly 预发布版本](https://github.com/happy-proto/fpc/releases/tag/nightly)：
+使用 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 安装最新正式版本：
 
 ```sh
-cargo binstall --git https://github.com/happy-proto/fpc \
-  --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
-  --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
-  --strategies crate-meta-data --force --no-confirm fpc
-```
-
-提供 Linux 的 x86-64、ARM64 和 macOS 的 ARM64 预编译二进制。`--force` 确保 Cargo 包版本未变化时也能更新 nightly 二进制。
-
-Intel Mac 可以从源码构建安装：
-
-```sh
-cargo install --git https://github.com/happy-proto/fpc --locked fpc
+cargo binstall fpc
 ```
 
 ## 使用方式
