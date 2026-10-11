@@ -2,7 +2,7 @@
 
 ## Prepare
 
-1. Create a release branch from `main` and choose a [semantic version](https://semver.org/spec/v2.0.0.html). The first functional release is `0.0.1`; `0.0.0` is only the Trusted Publishing bootstrap.
+1. Create a release branch from `main` and choose a [semantic version](https://semver.org/spec/v2.0.0.html).
 2. Update the package version with `cargo set-version <version>` if needed, then run `cargo check` to refresh the lockfile.
 3. Review `Unreleased` in [CHANGELOG.md](CHANGELOG.md). Move the release's changes into `## [<version>] - YYYY-MM-DD` using the publication date, retain an empty `Unreleased` section, and update the release/comparison links. Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 4. Run `mise run check`, `mise run test`, `cargo package --locked`, and `./scripts/release_notes.py v<version>`. Review the extracted highlights and update both README files if usage changed.
@@ -25,11 +25,9 @@ If a step fails, inspect the existing release, draft, tag, artifacts, and regist
 
 If the GitHub release exists but **Publish to crates.io** failed, fix the authentication or registry issue and rerun only the failed job. Do not rerun the successful GitHub release job. If Cargo timed out after uploading, check crates.io before retrying; the upload may have succeeded.
 
-## One-time Trusted Publishing setup
+## Trusted Publishing configuration
 
-crates.io requires an existing crate before [Trusted Publishing](https://crates.io/docs/trusted-publishing) can be configured. The empty 0.0.0 bootstrap release is published locally with an API token; it contains no CLI. The first functional release, 0.0.1, and subsequent releases use OIDC in CI.
-
-After the bootstrap publication, an owner must add a GitHub Trusted Publisher in the [crate settings](https://crates.io/crates/fpc/settings):
+Before publishing a version tag, confirm the [crate settings](https://crates.io/crates/fpc/settings) contain a GitHub [Trusted Publisher](https://crates.io/docs/trusted-publishing) matching the workflow:
 
 - Repository owner: `happy-proto`
 - Repository name: `fpc`
@@ -38,4 +36,3 @@ After the bootstrap publication, an owner must add a GitHub Trusted Publisher in
 
 The workflow grants `id-token: write` only to the tagged crate publishing job. `rust-lang/crates-io-auth-action` exchanges the GitHub identity token for a short-lived crates.io token and revokes it when the job completes. Do not add a permanent crates.io token to GitHub secrets.
 
-The 0.0.0 bootstrap is not a functional release and does not need a matching GitHub release or entry in the CLI changelog.
