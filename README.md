@@ -17,32 +17,6 @@ Install the latest stable release with [cargo-binstall](https://github.com/cargo
 cargo binstall fpc
 ```
 
-The first functional release is 0.0.1. Version 0.0.0 is an empty bootstrap crate used to configure Trusted Publishing and contains no CLI. Until 0.0.1 is published, use nightly below.
-
-Prebuilt binaries are available for Linux on x86-64 and ARM64, and for macOS on ARM64.
-
-<details>
-<summary>Install or update to the latest nightly</summary>
-
-To use the latest [nightly prerelease](https://github.com/happy-proto/fpc/releases/tag/nightly), override the stable download paths:
-
-```sh
-cargo binstall --git https://github.com/happy-proto/fpc \
-  --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
-  --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
-  --strategies crate-meta-data --force fpc
-```
-
-`--force` updates the nightly binary even when its Cargo package version has not changed. `--strategies crate-meta-data` requires a prebuilt binary. cargo-binstall has no `--nightly` option; `--version` accepts SemVer versions, not the `nightly` release tag.
-
-</details>
-
-On Intel Macs, build and install from source:
-
-```sh
-cargo install --git https://github.com/happy-proto/fpc --locked fpc
-```
-
 ## Usage
 
 ```sh

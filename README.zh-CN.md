@@ -17,32 +17,6 @@
 cargo binstall fpc
 ```
 
-首个可用版本是 0.0.1。0.0.0 是用于配置 Trusted Publishing 的空初始化 crate，不包含 CLI。0.0.1 发布前，请使用下面的 nightly 安装方式。
-
-提供 Linux 的 x86-64、ARM64 和 macOS 的 ARM64 预编译二进制。
-
-<details>
-<summary>安装或更新到最新 nightly</summary>
-
-安装最新的 [nightly 预发布版本](https://github.com/happy-proto/fpc/releases/tag/nightly) 时，覆盖正式版的下载路径：
-
-```sh
-cargo binstall --git https://github.com/happy-proto/fpc \
-  --pkg-url '{ repo }/releases/download/nightly/{ name }-{ target }-nightly.txz' \
-  --bin-dir '{ name }-{ target }-nightly/{ bin }{ binary-ext }' \
-  --strategies crate-meta-data --force fpc
-```
-
-`--force` 确保 Cargo 包版本未变化时也能更新 nightly 二进制。`--strategies crate-meta-data` 要求使用预编译二进制。cargo-binstall 没有 `--nightly` 选项；`--version` 接受 SemVer 版本号，不接受 `nightly` release tag。
-
-</details>
-
-Intel Mac 可以从源码构建安装：
-
-```sh
-cargo install --git https://github.com/happy-proto/fpc --locked fpc
-```
-
 ## 使用方式
 
 ```sh
