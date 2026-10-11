@@ -2,7 +2,7 @@
 
 ## Prepare
 
-1. Create a release branch from `main` and choose a [semantic version](https://semver.org/spec/v2.0.0.html). The first release is `0.0.1`.
+1. Create a release branch from `main` and choose a [semantic version](https://semver.org/spec/v2.0.0.html). The first functional release is `0.0.1`; `0.0.0` is only the Trusted Publishing bootstrap.
 2. Update the package version with `cargo set-version <version>` if needed, then run `cargo check` to refresh the lockfile.
 3. Review `Unreleased` in [CHANGELOG.md](CHANGELOG.md). Move the release's changes into `## [<version>] - YYYY-MM-DD` using the publication date, retain an empty `Unreleased` section, and update the release/comparison links. Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 4. Run `mise run check`, `mise run test`, `cargo package --locked`, and `./scripts/release_notes.py v<version>`. Review the extracted highlights and update both README files if usage changed.
