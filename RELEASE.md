@@ -17,22 +17,10 @@
    git push origin v<version>
    ```
 
-2. Wait for the Release workflow to finish, including **Publish to crates.io**. After package validation and all target builds succeed, it creates the GitHub release and publishes the tagged package to crates.io using OIDC Trusted Publishing. Review the published assets and notes: the version's maintained changelog is followed by GitHub's generated changes since the previous stable release. CI extracts these notes; maintainers write the changelog before tagging.
-3. Confirm the intended version appears on crates.io. Publishing does not require local `cargo login` or a long-lived GitHub secret. Pull requests, nightly builds, and manual workflow dispatches do not publish crates.
+2. Wait for the Release workflow to finish, including **Publish to crates.io**. Review the published GitHub release, assets, and notes.
+3. Confirm the intended version appears on crates.io.
 4. Verify installation with `cargo binstall fpc --version <version> --no-confirm` and `cargo install fpc --version <version> --locked` in isolated installation directories. Check the binary's version and a representative copy operation. After the first crates.io publication, add its badges to both README files.
 
 If a step fails, inspect the existing release, draft, tag, artifacts, and registry before retrying only missing steps. Never move a published stable tag, replace its assets, or reuse a crate version; publish corrections as a new version.
 
-If the GitHub release exists but **Publish to crates.io** failed, fix the authentication or registry issue and rerun only the failed job. Do not rerun the successful GitHub release job. If Cargo timed out after uploading, check crates.io before retrying; the upload may have succeeded.
-
-## Trusted Publishing configuration
-
-Before publishing a version tag, confirm the [crate settings](https://crates.io/crates/fpc/settings) contain a GitHub [Trusted Publisher](https://crates.io/docs/trusted-publishing) matching the workflow:
-
-- Repository owner: `happy-proto`
-- Repository name: `fpc`
-- Workflow filename: `release.yml`
-- Environment: leave empty (the publishing job does not use a GitHub environment)
-
-The workflow grants `id-token: write` only to the tagged crate publishing job. `rust-lang/crates-io-auth-action` exchanges the GitHub identity token for a short-lived crates.io token and revokes it when the job completes. Do not add a permanent crates.io token to GitHub secrets.
-
+If the GitHub release exists but **Publish to crates.io** failed, rerun only the failed job after resolving the failure. Do not rerun the successful GitHub release job. If Cargo timed out after uploading, check crates.io before retrying; the upload may have succeeded.
