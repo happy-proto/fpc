@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Place the fuzzy picker's search prompt at the bottom of the terminal, with scan warnings directly above it.
+
 ## [0.0.1] - 2026-10-11
 
 ### Added

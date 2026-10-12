@@ -131,8 +131,8 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
             screen.0.draw(|frame| {
                 let areas = Layout::vertical([
                     Constraint::Length(1),
-                    Constraint::Length(1),
                     Constraint::Min(1),
+                    Constraint::Length(1),
                     Constraint::Length(1),
                 ])
                 .split(frame.area());
@@ -147,7 +147,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                 );
                 frame.render_widget(
                     Paragraph::new(format!("> {query}")).style(Style::default().fg(Color::Cyan)),
-                    areas[1],
+                    areas[3],
                 );
                 let items: Vec<_> = matches
                     .iter()
@@ -159,7 +159,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),
                     ),
-                    areas[2],
+                    areas[1],
                     &mut list_state,
                 );
                 if warnings > 0 {
@@ -170,7 +170,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                     frame.render_widget(
                         Paragraph::new(format!("{warnings} scan warning(s): {safe}"))
                             .style(Style::default().fg(Color::Yellow)),
-                        areas[3],
+                        areas[2],
                     );
                 }
             })?;
