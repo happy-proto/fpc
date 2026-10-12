@@ -454,6 +454,7 @@ dependencies = [
  "shadow-rs",
  "tempfile",
  "tui-input",
+ "unicode-segmentation",
 ]
 
 [[package]]
