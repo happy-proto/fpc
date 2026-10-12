@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Place the fuzzy picker's search prompt at the bottom of the terminal, with scan warnings directly above it.
+- Use a bottom-up fuzzy picker layout, with the best match nearest the status and search prompt and arrow keys following the displayed direction.
+- Edit search queries at a visible cursor using Left/Right, Home/End, Backspace, and Delete; insert typed or pasted text at the cursor and scroll long queries to keep it visible.
 
 ## [0.0.1] - 2026-10-11
 
