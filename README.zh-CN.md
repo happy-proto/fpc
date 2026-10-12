@@ -8,7 +8,7 @@
 
 快速找到文件或目录，用一条简短的命令复制绝对路径。
 
-给 Agent 指定文件时，工作区之外或被 `.gitignore` 忽略的路径往往不容易选择。`fpc` 让这些文件也能方便地找到，支持本地、SSH 和 tmux。使用 Rust 编写，内置模糊选择器。
+给 Agent 指定文件时，工作区之外或被 `.gitignore` 忽略的路径往往不容易选择。`fpc` 通过内置模糊选择器让这些文件也能方便地找到，支持本地、SSH 和 tmux。
 
 ## 安装
 
@@ -24,27 +24,11 @@ cargo binstall fpc
 fpc                          # 模糊选择当前目录及其子目录中的文件或目录
 fpc ./src/main.rs            # 直接复制路径
 fpc --respect-ignore        # 选择遵循 .gitignore 和 .ignore 规则
-fpc --ignore-file ./rules    # 使用自定义的 Git 风格 ignore 文件
 fpc --print ./src/main.rs    # 输出路径，不操作剪贴板
-fpc --install-completion fish # 安装动态 Tab 补全，也支持 bash 和 zsh
+fpc --install-completion     # 自动检测 shell 并安装补全
+fpc --help                   # 查看所有选项
 ```
 
-默认包含隐藏项和被忽略的路径。隐藏路径略微降权，显式搜索隐藏项时取消降权，高度相关的结果仍容易选中。Tab 默认补全当前路径层级中的文件和目录，不展示单独的 `.`，递归搜索交给交互式选择器。输入 `--` 后补全命令选项，选项值按类型补全，比如 `--install-completion` 后提供 shell 名称。
-
-选择器从底部向上展示：搜索输入栏和状态栏位于底部，最匹配的结果紧邻其上方。直接输入查询，用 ↑/↓ 或 Tab/Shift+Tab 选择，Enter 复制，Esc 取消。用 ←/→ 和 Home/End 移动输入光标，Backspace/Delete 编辑查询。路径会转换为绝对路径，不解析符号链接；即使目标不存在，也可以复制链接本身的路径。
-
-补全需要主动执行安装命令，只写独立文件，不修改 shell 启动配置。Fish 会自动加载；Bash 需要已安装并启用 `bash-completion`，检测不到时安装命令会报错退出。Zsh 需要在 `compinit` 前把 `${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions` 加入 `fpath`。安装命令会提示文件位置，升级程序通常无需重新安装补全。
-
-本地使用系统剪贴板，SSH 通过终端剪贴板支持（OSC 52），tmux 通过自身的剪贴板通道处理。复制成功时保持静默。远端复制需要终端支持；剪贴板通道不可用时显示提示并输出路径，方便手动复制。
-
-## 本地构建
-
-```sh
-cargo install --path . --locked
-```
-
-`fpc --version` 显示源码 commit 和构建信息；`fpc -V` 只输出包版本。源码有未提交改动时标记为 `dirty`。
-
-[nightly 预发布版本](https://github.com/happy-proto/fpc/releases/tag/nightly) 跟随 `main` 的成功构建更新。正式版本只通过匹配版本号的 tag 发布。
+默认包含隐藏项和被忽略的路径。
 
 贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)，发布流程见 [RELEASE.md](RELEASE.md)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。

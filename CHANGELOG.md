@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Use a bottom-up fuzzy picker layout, with the best match nearest the status and search prompt and arrow keys following the displayed direction.
-- Edit search queries at a visible cursor using Left/Right, Home/End, Backspace, and Delete; insert typed or pasted text at the cursor and scroll long queries to keep it visible.
+- Edit search queries at a visible cursor with character and word movement, Home/End and Ctrl+A/E, word deletion, and Ctrl+Y to paste deleted text. Insert typed or pasted text at the cursor and scroll long queries to keep it visible; character movement and deletion preserve whole Unicode graphemes.
 
 ## [0.0.1] - 2026-10-11
 

@@ -243,6 +243,26 @@ def verify_picker(binary, root):
     picker(binary, root, [], "nv-a", root / "nav-a", keys=b"\x1b[H\x1b[Ca\r")
     picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x1b[D\x1b[C\x7fa\r")
     picker(binary, root, [], "nav-", root / "nav-b", keys=b"\x1b[H\x1b[Fb\r")
+    picker(binary, root, [], "nav-", root / "nav-b", keys=b"\x01\x05b\r")
+    picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x02\x1b[3~a\r")
+    picker(binary, root, [], "nav-", root / "nav-b", keys=b"\x01\x06\x05b\r")
+    for backward in [b"\x1bb", b"\x1b[1;3D", b"\x1b[1;5D"]:
+        picker(binary, root, [], "nav-b", root / "nav-a", keys=backward + b"\x1bda\r")
+    for forward in [b"\x1bf", b"\x1b[1;3C", b"\x1b[1;5C"]:
+        picker(
+            binary,
+            root,
+            [],
+            "nav-b",
+            root / "nav-a",
+            keys=b"\x01" + forward + b"\x1bda\r",
+        )
+    picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x17a\r")
+    picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x1b\x7fa\r")
+    picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x02\x0ba\r")
+    picker(binary, root, [], "nav-b", root / "nav-b", keys=b"\x17\x19\r")
+    picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x01\x15nav-a\r")
+    picker(binary, root, [], "nav", root / "nav-b", keys=b"\x1b[A\x01\x05\r")
     picker(
         binary,
         root,
