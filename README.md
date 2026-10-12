@@ -33,6 +33,8 @@ Hidden files and ignored paths are included by default. Hidden paths rank slight
 
 The picker uses a bottom-up layout: the search prompt and status are at the bottom, with the best match just above them. Type to search; use ↑/↓ or Tab/Shift+Tab to select, Enter to copy, and Esc to cancel. Use ←/→ and Home/End to move the input cursor, and Backspace/Delete to edit the query. Paths become absolute without resolving symlinks; a link keeps its own path, even if its target is missing.
 
+Search editing also supports Ctrl+A/E for line start/end, Ctrl+B/F for character movement, and Alt+B/F, Alt+←/→, or Ctrl+←/→ for word movement. Ctrl+W or Alt+Backspace deletes the previous word; Alt+D deletes the next word. Ctrl+K deletes to the end, Ctrl+U clears the query, and Ctrl+Y pastes deleted text. Command+←/→ and Option+←/→ work when your terminal maps them to these editing keys.
+
 Completion installation is explicit and writes a separate file without editing shell startup files. Fish loads it automatically; Bash requires installed and enabled `bash-completion` (installation fails if it cannot be detected). For Zsh, add `${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions` to `fpath` before `compinit`. The installer prints the location; upgrades usually do not require reinstalling completion.
 
 Local sessions use the system clipboard; SSH uses terminal clipboard support (OSC 52), and tmux uses its clipboard channel. Copying is silent on success. Remote copying requires a compatible terminal. If no clipboard channel is available, a warning is shown and the path is printed for manual copying.

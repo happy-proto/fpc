@@ -22,6 +22,7 @@ nucleo-matcher = "0.3.1"
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
 shadow-rs = { version = "2.0.0", default-features = false }
 tempfile = "3.27.0"
+tui-input = { version = "0.15.5", default-features = false, features = ["crossterm"] }
 
 [build-dependencies]
 shadow-rs = { version = "2.0.0", default-features = false, features = ["build"] }

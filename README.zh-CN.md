@@ -33,6 +33,8 @@ fpc --install-completion fish # 安装动态 Tab 补全，也支持 bash 和 zsh
 
 选择器从底部向上展示：搜索输入栏和状态栏位于底部，最匹配的结果紧邻其上方。直接输入查询，用 ↑/↓ 或 Tab/Shift+Tab 选择，Enter 复制，Esc 取消。用 ←/→ 和 Home/End 移动输入光标，Backspace/Delete 编辑查询。路径会转换为绝对路径，不解析符号链接；即使目标不存在，也可以复制链接本身的路径。
 
+搜索编辑还支持 Ctrl+A/E 跳到行首/行尾，Ctrl+B/F 按字符移动，以及 Alt+B/F、Alt+←/→ 或 Ctrl+←/→ 按词移动。Ctrl+W 或 Alt+Backspace 删除前一个词，Alt+D 删除后一个词。Ctrl+K 删除到行尾，Ctrl+U 清空查询，Ctrl+Y 粘贴删除的文字。终端将 Command+←/→ 和 Option+←/→ 映射为这些编辑按键时，也可以直接使用。
+
 补全需要主动执行安装命令，只写独立文件，不修改 shell 启动配置。Fish 会自动加载；Bash 需要已安装并启用 `bash-completion`，检测不到时安装命令会报错退出。Zsh 需要在 `compinit` 前把 `${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions` 加入 `fpath`。安装命令会提示文件位置，升级程序通常无需重新安装补全。
 
 本地使用系统剪贴板，SSH 通过终端剪贴板支持（OSC 52），tmux 通过自身的剪贴板通道处理。复制成功时保持静默。远端复制需要终端支持；剪贴板通道不可用时显示提示并输出路径，方便手动复制。

@@ -2,7 +2,7 @@ use crate::paths::{self, Candidate};
 use anyhow::{Context, Result};
 use crossterm::{
     event::{
-        self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEventKind,
+        self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
         KeyModifiers,
     },
     execute,
@@ -13,7 +13,6 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::Line,
     widgets::{List, ListDirection, ListItem, ListState, Paragraph},
 };
 use std::{
@@ -23,67 +22,51 @@ use std::{
     thread,
     time::Duration,
 };
+use tui_input::{Input, InputRequest, backend::crossterm::to_input_request};
 
 struct Screen(Terminal<CrosstermBackend<File>>);
 
-#[derive(Default)]
-struct Query {
-    text: String,
-    cursor: usize,
+fn input_request(key: KeyEvent) -> Option<InputRequest> {
+    // Crossterm distinguishes ALT from META; accept both for word editing.
+    match (key.code, key.modifiers) {
+        (KeyCode::Left | KeyCode::Char('b'), KeyModifiers::ALT | KeyModifiers::META) => {
+            Some(InputRequest::GoToPrevWord)
+        }
+        (KeyCode::Right | KeyCode::Char('f'), KeyModifiers::ALT | KeyModifiers::META) => {
+            Some(InputRequest::GoToNextWord)
+        }
+        (KeyCode::Char('d'), KeyModifiers::ALT | KeyModifiers::META) => {
+            Some(InputRequest::DeleteNextWord)
+        }
+        _ => to_input_request(&Event::Key(key)),
+    }
 }
 
-impl Query {
-    fn insert(&mut self, text: &str) {
-        self.text.insert_str(self.cursor, text);
-        self.cursor += text.len();
+fn render_query(query: &Input, frame: &mut Frame, area: Rect) {
+    if area.is_empty() {
+        return;
     }
-
-    fn left(&mut self) {
-        if let Some(c) = self.text[..self.cursor].chars().next_back() {
-            self.cursor -= c.len_utf8();
-        }
+    let style = Style::default().fg(Color::Cyan);
+    frame.render_widget(Paragraph::new("> ").style(style), area);
+    if area.width <= 2 {
+        frame.set_cursor_position((area.right() - 1, area.y));
+        return;
     }
-
-    fn right(&mut self) {
-        if let Some(c) = self.text[self.cursor..].chars().next() {
-            self.cursor += c.len_utf8();
-        }
-    }
-
-    fn backspace(&mut self) {
-        let end = self.cursor;
-        self.left();
-        self.text.drain(self.cursor..end);
-    }
-
-    fn delete(&mut self) {
-        if self.cursor < self.text.len() {
-            self.text.remove(self.cursor);
-        }
-    }
-
-    fn render(&self, frame: &mut Frame, area: Rect) {
-        if area.is_empty() {
-            return;
-        }
-        let available = usize::from(area.width.saturating_sub(3));
-        let mut start = 0;
-        let mut cursor_width = Line::from(&self.text[..self.cursor]).width();
-        for (index, c) in self.text[..self.cursor].char_indices() {
-            if cursor_width <= available {
-                break;
-            }
-            start = index + c.len_utf8();
-            cursor_width = Line::from(&self.text[start..self.cursor]).width();
-        }
-        frame.render_widget(
-            Paragraph::new(format!("> {}", &self.text[start..]))
-                .style(Style::default().fg(Color::Cyan)),
-            area,
-        );
-        let column = (cursor_width + 2).min(usize::from(area.width - 1));
-        frame.set_cursor_position((area.x + column as u16, area.y));
-    }
+    let text_area = Rect::new(area.x + 2, area.y, area.width - 2, 1);
+    let scroll = query
+        .visual_scroll(usize::from(text_area.width - 1))
+        .min(usize::from(u16::MAX));
+    frame.render_widget(
+        Paragraph::new(query.value())
+            .style(style)
+            .scroll((0, scroll as u16)),
+        text_area,
+    );
+    let column = query
+        .visual_cursor()
+        .saturating_sub(scroll)
+        .min(usize::from(text_area.width - 1));
+    frame.set_cursor_position((text_area.x + column as u16, text_area.y));
 }
 
 impl Screen {
@@ -141,7 +124,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
     });
     let mut candidates = Vec::new();
     let mut matches = Vec::new();
-    let mut query = Query::default();
+    let mut query = Input::default();
     let mut selected = 0usize;
     let mut list_state = ListState::default();
     let mut scanning = true;
@@ -172,16 +155,16 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
         }
         if dirty {
             redraw = true;
-            let previous = if query.text == last_query {
+            let previous = if query.value() == last_query {
                 matches.get(selected).copied()
             } else {
                 None
             };
-            matches = paths::rank(&candidates, &query.text);
+            matches = paths::rank(&candidates, query.value());
             selected = previous
                 .and_then(|index| matches.iter().position(|candidate| *candidate == index))
                 .unwrap_or(0);
-            last_query.clone_from(&query.text);
+            last_query = query.value().to_owned();
             dirty = false;
         }
         list_state.select(if matches.is_empty() {
@@ -207,7 +190,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                     )),
                     areas[2],
                 );
-                query.render(frame, areas[3]);
+                render_query(&query, frame, areas[3]);
                 let items: Vec<_> = matches
                     .iter()
                     .map(|&index| ListItem::new(candidates[index].label.as_str()))
@@ -273,41 +256,22 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                         selected = (selected + matches.len() - 1) % matches.len();
                     }
                 }
-                KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    query = Query::default();
-                    selected = 0;
-                    dirty = true;
+                _ => {
+                    if let Some(change) =
+                        input_request(key).and_then(|request| query.handle(request))
+                        && change.value
+                    {
+                        selected = 0;
+                        dirty = true;
+                    }
                 }
-                KeyCode::Backspace => {
-                    query.backspace();
-                    selected = 0;
-                    dirty = true;
-                }
-                KeyCode::Delete => {
-                    query.delete();
-                    selected = 0;
-                    dirty = true;
-                }
-                KeyCode::Left => query.left(),
-                KeyCode::Right => query.right(),
-                KeyCode::Home => query.cursor = 0,
-                KeyCode::End => query.cursor = query.text.len(),
-                KeyCode::Char(c)
-                    if !key
-                        .modifiers
-                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-                {
-                    query.insert(c.encode_utf8(&mut [0; 4]));
-                    selected = 0;
-                    dirty = true;
-                }
-                _ => {}
             },
             Event::Paste(text) => {
-                let text: String = text.chars().filter(|c| !c.is_control()).collect();
-                query.insert(&text);
-                selected = 0;
-                dirty = true;
+                for c in text.chars().filter(|c| !c.is_control()) {
+                    query.handle(InputRequest::InsertChar(c));
+                    selected = 0;
+                    dirty = true;
+                }
             }
             _ => {}
         }
@@ -320,37 +284,36 @@ mod tests {
     use ratatui::backend::{Backend, TestBackend};
 
     #[test]
-    fn query_edits_at_utf8_boundaries() {
-        let mut query = Query::default();
-        query.insert("中文");
-        query.left();
-        query.insert("🙂");
-        assert_eq!(query.text, "中🙂文");
-        query.backspace();
-        assert_eq!(query.text, "中文");
-        query.delete();
-        assert_eq!(query.text, "中");
-        query.right();
-        query.delete();
-        assert_eq!(query.cursor, query.text.len());
-        query.left();
-        query.left();
-        query.backspace();
-        assert_eq!(query.cursor, 0);
-        assert_eq!(query.text, "中");
-        query.insert("ab");
-        query.right();
-        query.backspace();
-        assert_eq!(query.text, "ab");
+    fn readline_keys_edit_at_the_cursor() {
+        for modifier in [KeyModifiers::ALT, KeyModifiers::META] {
+            let mut query = Input::new("中文 test".to_owned());
+            for (code, modifiers) in [
+                (KeyCode::Char('b'), modifier),
+                (KeyCode::Char('d'), modifier),
+                (KeyCode::Char('X'), KeyModifiers::SHIFT),
+                (KeyCode::Char('a'), KeyModifiers::CONTROL),
+                (KeyCode::Char('!'), KeyModifiers::NONE),
+                (KeyCode::Char('e'), KeyModifiers::CONTROL),
+            ] {
+                query.handle(input_request(KeyEvent::new(code, modifiers)).unwrap());
+            }
+            assert_eq!(query.value(), "!中文 X");
+            assert_eq!(query.cursor(), query.value().chars().count());
+        }
+        let mut query = Input::new("a👩‍💻b".to_owned());
+        for code in [KeyCode::Left, KeyCode::Backspace] {
+            query.handle(input_request(KeyEvent::new(code, KeyModifiers::NONE)).unwrap());
+        }
+        assert_eq!(query.value(), "ab");
+        assert_eq!(query.cursor(), 1);
     }
 
     #[test]
     fn query_scrolls_to_keep_the_cursor_visible() {
-        let mut query = Query::default();
-        query.insert("ab中文z");
+        let mut query = Input::new("ab中文z".to_owned());
         let mut terminal = Terminal::new(TestBackend::new(8, 1)).unwrap();
         terminal
-            .draw(|frame| query.render(frame, frame.area()))
+            .draw(|frame| render_query(&query, frame, frame.area()))
             .unwrap();
         let buffer = terminal.backend().buffer();
         assert_eq!(buffer[(0, 0)].symbol(), ">");
@@ -362,9 +325,9 @@ mod tests {
             (7, 0).into()
         );
 
-        query.cursor = 0;
+        query.handle(InputRequest::GoToStart);
         terminal
-            .draw(|frame| query.render(frame, frame.area()))
+            .draw(|frame| render_query(&query, frame, frame.area()))
             .unwrap();
         assert_eq!(terminal.backend().buffer()[(2, 0)].symbol(), "a");
         assert_eq!(
@@ -374,7 +337,7 @@ mod tests {
         for width in 1..=3 {
             let mut terminal = Terminal::new(TestBackend::new(width, 1)).unwrap();
             terminal
-                .draw(|frame| query.render(frame, frame.area()))
+                .draw(|frame| render_query(&query, frame, frame.area()))
                 .unwrap();
             assert!(terminal.backend_mut().get_cursor_position().unwrap().x < width);
         }
