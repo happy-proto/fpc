@@ -213,6 +213,7 @@ def verify_picker(binary, root):
         "visible.txt",
         "nav-a",
         "nav-b",
+        "nav-c",
         ".secret",
         "ignored-only",
         "odd space\n中文",
@@ -234,8 +235,22 @@ def verify_picker(binary, root):
         root / ".private/nested-target",
     )
     picker(binary, root, [], ".private", root / ".private")
-    for key in [b"\t", b"\x1b[B"]:
+    for key in [b"\t", b"\x1b[A", b"\x10"]:
         picker(binary, root, [], "nav", root / "nav-b", keys=key + b"\r")
+    for key in [b"\x1b[Z", b"\x1b[B", b"\x0e"]:
+        picker(binary, root, [], "nav", root / "nav-c", keys=key + b"\r")
+    picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x1b[D\x1b[3~a\r")
+    picker(binary, root, [], "nv-a", root / "nav-a", keys=b"\x1b[H\x1b[Ca\r")
+    picker(binary, root, [], "nav-b", root / "nav-a", keys=b"\x1b[D\x1b[C\x7fa\r")
+    picker(binary, root, [], "nav-", root / "nav-b", keys=b"\x1b[H\x1b[Fb\r")
+    picker(
+        binary,
+        root,
+        [],
+        "odd 中文",
+        root / "odd space\n中文",
+        keys=b"\x1b[H\x1b[C\x1b[C\x1b[C\x1b[C\x1b[200~space\x1b[201~\r",
+    )
     for key in [b"\x1b", b"\x03", b"\x04"]:
         picker(binary, root, [], "", keys=key)
     excluded(binary, root, ["--respect-ignore"], "ignored-only")

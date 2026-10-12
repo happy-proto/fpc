@@ -9,11 +9,12 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
-    Terminal,
+    Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{List, ListItem, ListState, Paragraph},
+    text::Line,
+    widgets::{List, ListDirection, ListItem, ListState, Paragraph},
 };
 use std::{
     fs::{File, OpenOptions},
@@ -24,6 +25,67 @@ use std::{
 };
 
 struct Screen(Terminal<CrosstermBackend<File>>);
+
+#[derive(Default)]
+struct Query {
+    text: String,
+    cursor: usize,
+}
+
+impl Query {
+    fn insert(&mut self, text: &str) {
+        self.text.insert_str(self.cursor, text);
+        self.cursor += text.len();
+    }
+
+    fn left(&mut self) {
+        if let Some(c) = self.text[..self.cursor].chars().next_back() {
+            self.cursor -= c.len_utf8();
+        }
+    }
+
+    fn right(&mut self) {
+        if let Some(c) = self.text[self.cursor..].chars().next() {
+            self.cursor += c.len_utf8();
+        }
+    }
+
+    fn backspace(&mut self) {
+        let end = self.cursor;
+        self.left();
+        self.text.drain(self.cursor..end);
+    }
+
+    fn delete(&mut self) {
+        if self.cursor < self.text.len() {
+            self.text.remove(self.cursor);
+        }
+    }
+
+    fn render(&self, frame: &mut Frame, area: Rect) {
+        if area.is_empty() {
+            return;
+        }
+        let available = usize::from(area.width.saturating_sub(3));
+        let mut start = 0;
+        let mut cursor_width = Line::from(&self.text[..self.cursor]).width();
+        for (index, c) in self.text[..self.cursor].char_indices() {
+            if cursor_width <= available {
+                break;
+            }
+            start = index + c.len_utf8();
+            cursor_width = Line::from(&self.text[start..self.cursor]).width();
+        }
+        frame.render_widget(
+            Paragraph::new(format!("> {}", &self.text[start..]))
+                .style(Style::default().fg(Color::Cyan)),
+            area,
+        );
+        let column = (cursor_width + 2).min(usize::from(area.width - 1));
+        frame.set_cursor_position((area.x + column as u16, area.y));
+    }
+}
+
 impl Screen {
     fn open() -> Result<Self> {
         let tty = OpenOptions::new()
@@ -79,7 +141,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
     });
     let mut candidates = Vec::new();
     let mut matches = Vec::new();
-    let mut query = String::new();
+    let mut query = Query::default();
     let mut selected = 0usize;
     let mut list_state = ListState::default();
     let mut scanning = true;
@@ -110,16 +172,16 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
         }
         if dirty {
             redraw = true;
-            let previous = if query == last_query {
+            let previous = if query.text == last_query {
                 matches.get(selected).copied()
             } else {
                 None
             };
-            matches = paths::rank(&candidates, &query);
+            matches = paths::rank(&candidates, &query.text);
             selected = previous
                 .and_then(|index| matches.iter().position(|candidate| *candidate == index))
                 .unwrap_or(0);
-            last_query.clone_from(&query);
+            last_query.clone_from(&query.text);
             dirty = false;
         }
         list_state.select(if matches.is_empty() {
@@ -130,9 +192,9 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
         if redraw {
             screen.0.draw(|frame| {
                 let areas = Layout::vertical([
-                    Constraint::Length(1),
-                    Constraint::Length(1),
                     Constraint::Min(1),
+                    Constraint::Length(u16::from(warnings > 0)),
+                    Constraint::Length(1),
                     Constraint::Length(1),
                 ])
                 .split(frame.area());
@@ -143,23 +205,23 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                         candidates.len(),
                         if scanning { " (scanning)" } else { "" }
                     )),
-                    areas[0],
+                    areas[2],
                 );
-                frame.render_widget(
-                    Paragraph::new(format!("> {query}")).style(Style::default().fg(Color::Cyan)),
-                    areas[1],
-                );
+                query.render(frame, areas[3]);
                 let items: Vec<_> = matches
                     .iter()
                     .map(|&index| ListItem::new(candidates[index].label.as_str()))
                     .collect();
                 frame.render_stateful_widget(
-                    List::new(items).highlight_symbol("› ").highlight_style(
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    areas[2],
+                    List::new(items)
+                        .direction(ListDirection::BottomToTop)
+                        .highlight_symbol("› ")
+                        .highlight_style(
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                    areas[0],
                     &mut list_state,
                 );
                 if warnings > 0 {
@@ -170,7 +232,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                     frame.render_widget(
                         Paragraph::new(format!("{warnings} scan warning(s): {safe}"))
                             .style(Style::default().fg(Color::Yellow)),
-                        areas[3],
+                        areas[1],
                     );
                 }
             })?;
@@ -191,53 +253,130 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                         return Ok(Some(candidates[index].path.clone()));
                     }
                 }
-                KeyCode::Down | KeyCode::Tab => {
+                KeyCode::Up | KeyCode::Tab => {
                     if !matches.is_empty() {
                         selected = (selected + 1) % matches.len();
                     }
                 }
-                KeyCode::Up | KeyCode::BackTab => {
+                KeyCode::Down | KeyCode::BackTab => {
                     if !matches.is_empty() {
                         selected = (selected + matches.len() - 1) % matches.len();
                     }
                 }
-                KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     if !matches.is_empty() {
                         selected = (selected + 1) % matches.len();
                     }
                 }
-                KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                KeyCode::Char('n') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     if !matches.is_empty() {
                         selected = (selected + matches.len() - 1) % matches.len();
                     }
                 }
                 KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    query.clear();
+                    query = Query::default();
                     selected = 0;
                     dirty = true;
                 }
                 KeyCode::Backspace => {
-                    query.pop();
+                    query.backspace();
                     selected = 0;
                     dirty = true;
                 }
+                KeyCode::Delete => {
+                    query.delete();
+                    selected = 0;
+                    dirty = true;
+                }
+                KeyCode::Left => query.left(),
+                KeyCode::Right => query.right(),
+                KeyCode::Home => query.cursor = 0,
+                KeyCode::End => query.cursor = query.text.len(),
                 KeyCode::Char(c)
                     if !key
                         .modifiers
                         .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
-                    query.push(c);
+                    query.insert(c.encode_utf8(&mut [0; 4]));
                     selected = 0;
                     dirty = true;
                 }
                 _ => {}
             },
             Event::Paste(text) => {
-                query.extend(text.chars().filter(|c| !c.is_control()));
+                let text: String = text.chars().filter(|c| !c.is_control()).collect();
+                query.insert(&text);
                 selected = 0;
                 dirty = true;
             }
             _ => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::backend::{Backend, TestBackend};
+
+    #[test]
+    fn query_edits_at_utf8_boundaries() {
+        let mut query = Query::default();
+        query.insert("中文");
+        query.left();
+        query.insert("🙂");
+        assert_eq!(query.text, "中🙂文");
+        query.backspace();
+        assert_eq!(query.text, "中文");
+        query.delete();
+        assert_eq!(query.text, "中");
+        query.right();
+        query.delete();
+        assert_eq!(query.cursor, query.text.len());
+        query.left();
+        query.left();
+        query.backspace();
+        assert_eq!(query.cursor, 0);
+        assert_eq!(query.text, "中");
+        query.insert("ab");
+        query.right();
+        query.backspace();
+        assert_eq!(query.text, "ab");
+    }
+
+    #[test]
+    fn query_scrolls_to_keep_the_cursor_visible() {
+        let mut query = Query::default();
+        query.insert("ab中文z");
+        let mut terminal = Terminal::new(TestBackend::new(8, 1)).unwrap();
+        terminal
+            .draw(|frame| query.render(frame, frame.area()))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].symbol(), ">");
+        assert_eq!(buffer[(2, 0)].symbol(), "中");
+        assert_eq!(buffer[(4, 0)].symbol(), "文");
+        assert_eq!(buffer[(6, 0)].symbol(), "z");
+        assert_eq!(
+            terminal.backend_mut().get_cursor_position().unwrap(),
+            (7, 0).into()
+        );
+
+        query.cursor = 0;
+        terminal
+            .draw(|frame| query.render(frame, frame.area()))
+            .unwrap();
+        assert_eq!(terminal.backend().buffer()[(2, 0)].symbol(), "a");
+        assert_eq!(
+            terminal.backend_mut().get_cursor_position().unwrap(),
+            (2, 0).into()
+        );
+        for width in 1..=3 {
+            let mut terminal = Terminal::new(TestBackend::new(width, 1)).unwrap();
+            terminal
+                .draw(|frame| query.render(frame, frame.area()))
+                .unwrap();
+            assert!(terminal.backend_mut().get_cursor_position().unwrap().x < width);
         }
     }
 }
