@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-10-12
+
 ### Changed
 
 - Use a bottom-up fuzzy picker layout, with the best match nearest the status and search prompt and arrow keys following the displayed direction.
@@ -22,5 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dynamic Bash, Fish, and Zsh completion for paths, options, and shell names, with explicit installation into standalone files without editing shell startup files.
 - Detailed `--version` output with source commit, dirty state, and build information, plus a short `-V` form.
 
-[Unreleased]: https://github.com/happy-proto/fpc/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/happy-proto/fpc/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/happy-proto/fpc/releases/tag/v0.0.2
 [0.0.1]: https://github.com/happy-proto/fpc/releases/tag/v0.0.1
