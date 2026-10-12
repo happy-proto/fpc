@@ -31,4 +31,6 @@ fpc --help                   # Explore all options
 
 Hidden files and ignored paths are included by default.
 
+The picker highlights the characters that matched your query, even when they are spread across the path, and scrolls long results to reveal the matching region. Type `'dcjanus` (a single leading quote) to require the continuous substring `dcjanus`; plain `dcjanus` uses fuzzy matching.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions, [RELEASE.md](RELEASE.md) for the release procedure, and [CHANGELOG.md](CHANGELOG.md) for changes.

@@ -3,6 +3,7 @@
 # /// script
 # requires-python = ">=3.15"
 # dependencies = [
+#     "pyte>=0.8.2",
 #     "typer>=0.27.3",
 # ]
 # ///
@@ -25,13 +26,16 @@ import tomllib
 from pathlib import Path
 from typing import Annotated
 
+import pyte
 import typer
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
 
 class Process:
-    def __init__(self, binary, arguments, directory, environment):
+    def __init__(
+        self, binary, arguments, directory, environment, *, columns=120, rows=30
+    ):
         self.stdout = directory / "stdout"
         self.stderr = directory / "stderr"
         ready, start = os.pipe()
@@ -46,7 +50,9 @@ class Process:
                 os.dup2(descriptor, number)
                 os.close(descriptor)
             os.execve(str(binary), [str(binary), *arguments], environment)
-        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 120, 0, 0))
+        fcntl.ioctl(
+            self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0)
+        )
         self.output = b""
         self.status = None
         self.initial_modes = termios.tcgetattr(self.fd)[3]
@@ -79,6 +85,12 @@ class Process:
 
     def send(self, value):
         os.write(self.fd, value)
+
+    def resize(self, columns, rows):
+        fcntl.ioctl(
+            self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0)
+        )
+        os.kill(self.pid, signal.SIGWINCH)
 
     def finish(self):
         deadline = time.monotonic() + 5
@@ -204,6 +216,131 @@ def excluded(binary, root, arguments, query):
         assert process.status is None, (query, process.output)
         process.send(b"\x1b")
         assert process.finish() == (b"", b"")
+    finally:
+        process.close()
+
+
+def verify_picker_display(binary, root):
+    directory = root / "display"
+    directory.mkdir()
+    (directory / "visible.txt").touch()
+    exact = directory / "dcjanus.txt"
+    exact.touch()
+    fuzzy = (
+        directory
+        / ".cargo/git/checkouts/wezterm-4257166e01909a3c/90b1d62/deps/harfbuzz/harfbuzz/test/subset/data/expected/japanese/Mplus1p-Regular.default.660E.ttf"
+    )
+    fuzzy.parent.mkdir(parents=True)
+    fuzzy.touch()
+    process = Process(
+        binary, ["--print"], directory, environment(directory), columns=64, rows=10
+    )
+    screen = pyte.Screen(64, 10)
+    stream = pyte.ByteStream(screen)
+    consumed = 0
+
+    def wait_screen(predicate):
+        nonlocal consumed
+        deadline = time.monotonic() + 5
+        while True:
+            process.read()
+            stream.feed(process.output[consumed:])
+            consumed = len(process.output)
+            if predicate():
+                return
+            assert process.status is None, process.output
+            assert time.monotonic() < deadline, screen.display
+
+    def highlighted_rows():
+        return [
+            "".join(
+                screen.buffer[y][x].data
+                for x in range(screen.columns)
+                if screen.buffer[y][x].bold
+            )
+            for y in range(screen.lines - 2)
+        ]
+
+    try:
+        wait_screen(lambda: any("visible.txt" in row for row in screen.display))
+        process.send(b"dcjanus")
+        wait_screen(lambda: highlighted_rows().count("dcjanus") == 2)
+        assert any(
+            row.lstrip().startswith("…") and row.rstrip().endswith("…")
+            for row in screen.display
+        )
+        current = next(
+            y for y, row in enumerate(screen.display) if row.startswith("› ")
+        )
+        assert screen.buffer[current][2].fg != screen.buffer[current][9].fg
+
+        # Select the long result, then narrow and widen the real terminal.
+        process.send(b"\x1b[A")
+        wait_screen(lambda: any(row.startswith("› …") for row in screen.display))
+        for columns, rows in [(48, 6), (80, 12)]:
+            screen.resize(lines=rows, columns=columns)
+            process.resize(columns, rows)
+            wait_screen(
+                lambda: (
+                    highlighted_rows().count("dcjanus") == 2
+                    and screen.display[-1].startswith("> dcjanus")
+                )
+            )
+            assert any(row.startswith("› …") for row in screen.display)
+
+        # Clipping and styling must not change the accepted absolute path.
+        process.send(b"\r")
+        assert process.finish() == (os.fsencode(fuzzy) + b"\n", b"")
+    finally:
+        process.close()
+
+    # The existing exact-substring syntax excludes the fuzzy-only path.
+    process = Process(
+        binary, ["--print"], directory, environment(directory), columns=64, rows=10
+    )
+    screen = pyte.Screen(64, 10)
+    stream = pyte.ByteStream(screen)
+    consumed = 0
+    try:
+        wait_screen(lambda: any("visible.txt" in row for row in screen.display))
+        process.send(b"'dcjanus")
+        wait_screen(
+            lambda: (
+                highlighted_rows().count("dcjanus") == 1 and "1 /" in screen.display[-2]
+            )
+        )
+        assert not any("japanese" in row for row in screen.display)
+        process.send(b"\x15")
+        wait_screen(
+            lambda: screen.display[-1].rstrip() == ">" and not any(highlighted_rows())
+        )
+        process.send(b"'dcjanus\r")
+        assert process.finish() == (os.fsencode(exact) + b"\n", b"")
+    finally:
+        process.close()
+
+    # Newly visible results stay highlighted after vertical scrolling and resize.
+    for index in range(8):
+        (directory / f"scroll-{index}").touch()
+    process = Process(
+        binary, ["--print"], directory, environment(directory), columns=24, rows=5
+    )
+    screen = pyte.Screen(24, 5)
+    stream = pyte.ByteStream(screen)
+    consumed = 0
+    try:
+        process.wait_for(b"\x1b[?1049h")
+        process.send(b"'scroll")
+        wait_screen(lambda: highlighted_rows().count("scroll") == 3)
+        process.send(b"\t" * 5)
+        wait_screen(lambda: any(row.startswith("› scroll-5") for row in screen.display))
+        assert highlighted_rows().count("scroll") == 3
+        screen.resize(lines=8, columns=32)
+        process.resize(32, 8)
+        wait_screen(lambda: highlighted_rows().count("scroll") == 6)
+        assert any(row.startswith("› scroll-5") for row in screen.display)
+        process.send(b"\r")
+        assert process.finish() == (os.fsencode(directory / "scroll-5") + b"\n", b"")
     finally:
         process.close()
 
@@ -343,6 +480,7 @@ def main(
         work = root / "picker"
         work.mkdir()
         verify_picker(binary, work)
+        verify_picker_display(binary, work)
     print(
         f"PTY clipboard and picker behavior passed ({time.monotonic() - started:.2f}s)"
     )

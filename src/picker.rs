@@ -8,11 +8,16 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use nucleo_matcher::{
+    Config, Matcher, Utf32Str,
+    pattern::{CaseMatching, Normalization, Pattern},
+};
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{List, ListDirection, ListItem, ListState, Paragraph},
 };
 use std::{
@@ -23,6 +28,7 @@ use std::{
     time::Duration,
 };
 use tui_input::{Input, InputRequest, backend::crossterm::to_input_request};
+use unicode_segmentation::UnicodeSegmentation;
 
 struct Screen(Terminal<CrosstermBackend<File>>);
 
@@ -67,6 +73,154 @@ fn render_query(query: &Input, frame: &mut Frame, area: Rect) {
         .saturating_sub(scroll)
         .min(usize::from(text_area.width - 1));
     frame.set_cursor_position((text_area.x + column as u16, text_area.y));
+}
+
+fn candidate_line(
+    candidate: &Candidate,
+    pattern: &Pattern,
+    matcher: &mut Matcher,
+    width: usize,
+) -> Line<'static> {
+    if width == 0 {
+        return Line::default();
+    }
+    let mut buffer = Vec::new();
+    let mut indices = Vec::new();
+    pattern.indices(
+        Utf32Str::new(candidate.search(), &mut buffer),
+        matcher,
+        &mut indices,
+    );
+    indices.sort_unstable();
+    indices.dedup();
+    let hit_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+    // Nucleo indices address graphemes, not UTF-8 bytes or terminal columns.
+    // Escape controls after matching so they cannot shift the highlight positions.
+    let mut spans: Vec<_> = candidate
+        .search()
+        .graphemes(true)
+        .enumerate()
+        .map(|(index, grapheme)| {
+            let text: String = grapheme
+                .chars()
+                .flat_map(|c| {
+                    if c.is_control() {
+                        c.escape_default().collect::<Vec<_>>()
+                    } else {
+                        vec![c]
+                    }
+                })
+                .collect();
+            Span::styled(
+                text,
+                if indices.binary_search(&(index as u32)).is_ok() {
+                    hit_style
+                } else {
+                    Style::default()
+                },
+            )
+        })
+        .collect();
+    if candidate.label.ends_with('/') {
+        spans.push(Span::raw("/"));
+    }
+    let widths: Vec<_> = spans.iter().map(Span::width).collect();
+    let total: usize = widths.iter().sum();
+    if total <= width {
+        return Line::from(spans);
+    }
+    if width == 1 {
+        return Line::raw("…");
+    }
+    let last_hit = indices.last().map(|&index| index as usize);
+    let focus_end: usize = last_hit.map_or(0, |index| widths[..=index].iter().sum());
+    // Keep some trailing context and the final hit visible. Both clipped ends
+    // reserve a column for an ellipsis; wide graphemes remain whole.
+    let target_start = if focus_end < width {
+        0
+    } else {
+        (focus_end + 10.min(width / 3))
+            .min(total)
+            .saturating_sub(width - 2)
+    };
+    let mut start = 0;
+    let mut skipped = 0;
+    while skipped < target_start && start < last_hit.unwrap_or(0) {
+        skipped += widths[start];
+        start += 1;
+    }
+    let mut available = width - usize::from(start > 0);
+    if total - skipped > available {
+        available -= 1;
+    }
+    let mut end = start;
+    let mut used = 0;
+    while end < spans.len() && used + widths[end] <= available {
+        used += widths[end];
+        end += 1;
+    }
+    let mut visible = Vec::new();
+    if start > 0 {
+        visible.push(Span::raw("…"));
+    }
+    visible.extend(spans.drain(start..end));
+    if used + skipped < total {
+        visible.push(Span::raw("…"));
+    }
+    Line::from(visible)
+}
+
+fn render_results(
+    frame: &mut Frame,
+    area: Rect,
+    candidates: &[Candidate],
+    matches: &[usize],
+    state: &mut ListState,
+    query: &str,
+) {
+    let height = usize::from(area.height);
+    let selected = state.selected().unwrap_or(0);
+    let offset = state
+        .offset()
+        .min(selected)
+        .min(matches.len().saturating_sub(height));
+    let offset = if selected >= offset + height {
+        selected.saturating_sub(height.saturating_sub(1))
+    } else {
+        offset
+    };
+    *state.offset_mut() = offset;
+    let pattern = Pattern::parse(query, CaseMatching::Smart, Normalization::Smart);
+    let mut matcher = Matcher::new(Config::DEFAULT.match_paths());
+    let items: Vec<_> = matches
+        .iter()
+        .enumerate()
+        .map(|(position, &index)| {
+            let mut line = if (offset..offset + height).contains(&position) {
+                candidate_line(
+                    &candidates[index],
+                    &pattern,
+                    &mut matcher,
+                    usize::from(area.width.saturating_sub(2)),
+                )
+            } else {
+                Line::raw(candidates[index].label.as_str())
+            };
+            if state.selected() == Some(position) {
+                line = line.style(Style::default().fg(Color::Cyan));
+            }
+            ListItem::new(line)
+        })
+        .collect();
+    frame.render_stateful_widget(
+        List::new(items)
+            .direction(ListDirection::BottomToTop)
+            .highlight_symbol("› "),
+        area,
+        state,
+    );
 }
 
 impl Screen {
@@ -191,21 +345,13 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                     areas[2],
                 );
                 render_query(&query, frame, areas[3]);
-                let items: Vec<_> = matches
-                    .iter()
-                    .map(|&index| ListItem::new(candidates[index].label.as_str()))
-                    .collect();
-                frame.render_stateful_widget(
-                    List::new(items)
-                        .direction(ListDirection::BottomToTop)
-                        .highlight_symbol("› ")
-                        .highlight_style(
-                            Style::default()
-                                .fg(Color::Cyan)
-                                .add_modifier(Modifier::BOLD),
-                        ),
+                render_results(
+                    frame,
                     areas[0],
+                    &candidates,
+                    &matches,
                     &mut list_state,
+                    query.value(),
                 );
                 if warnings > 0 {
                     let safe: String = last_warning
@@ -282,6 +428,71 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
 mod tests {
     use super::*;
     use ratatui::backend::{Backend, TestBackend};
+
+    #[test]
+    fn highlighting_preserves_graphemes_controls_and_search_syntax() {
+        let root = Path::new("/root");
+        for (path, query, expected) in [
+            ("e\u{301}/👩‍💻/中文.txt", "中", "中"),
+            ("cafe\u{301}.txt", "cafe", "cafe\u{301}"),
+            ("emoji-👩‍💻.txt", "👩‍💻", "👩‍💻"),
+            ("odd\n\t\r\u{1b}/中文.txt", "中", "中"),
+            ("dcjanus.txt", "'dcjanus !other", "dcjanus"),
+            ("dcjanus.txt", "dcj jan", "dcjan"),
+            ("dcjanus.txt", "^dcj .txt$", "dcj.txt"),
+            ("dcjanus.txt", "!other", ""),
+            ("dcjanus.txt", "", ""),
+        ] {
+            let candidate = Candidate::new(root.join(path), root, false);
+            let pattern = Pattern::parse(query, CaseMatching::Smart, Normalization::Smart);
+            let mut matcher = Matcher::new(Config::DEFAULT.match_paths());
+            let line = candidate_line(&candidate, &pattern, &mut matcher, 100);
+            let highlighted: String = line
+                .spans
+                .iter()
+                .filter(|s| s.style.fg == Some(Color::Yellow))
+                .map(|s| s.content.as_ref())
+                .collect();
+            assert_eq!(highlighted, expected, "path={path:?}, query={query:?}");
+            let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+            assert_eq!(text, candidate.label);
+            assert!(!text.chars().any(char::is_control));
+        }
+        let candidate = Candidate::new(root.join("中文"), root, true);
+        let pattern = Pattern::parse("文", CaseMatching::Smart, Normalization::Smart);
+        let line = candidate_line(&candidate, &pattern, &mut Matcher::default(), 20);
+        assert_eq!(line.spans.last().unwrap().content, "/");
+        assert_eq!(line.spans.last().unwrap().style.fg, None);
+    }
+
+    #[test]
+    fn clipping_respects_terminal_width_and_whole_graphemes() {
+        let root = Path::new("/root");
+        let candidate = Candidate::new(
+            root.join("very/long/路径/e\u{301}/👩‍💻/中文.txt"),
+            root,
+            false,
+        );
+        for query in ["", "文", "👩‍💻", "e"] {
+            let pattern = Pattern::parse(query, CaseMatching::Smart, Normalization::Smart);
+            let mut matcher = Matcher::new(Config::DEFAULT.match_paths());
+            for width in 0..=40 {
+                let line = candidate_line(&candidate, &pattern, &mut matcher, width);
+                assert!(line.width() <= width, "query={query:?}, width={width}");
+                for span in &line.spans {
+                    assert_ne!(span.content, "\u{301}");
+                    assert_ne!(span.content, "👩");
+                    assert_ne!(span.content, "💻");
+                }
+                if width >= 5 && !query.is_empty() {
+                    assert!(
+                        line.spans.iter().any(|s| s.style.fg == Some(Color::Yellow)),
+                        "query={query:?}, width={width}"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn readline_keys_edit_at_the_cursor() {

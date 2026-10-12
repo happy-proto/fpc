@@ -29,6 +29,10 @@ pub struct Candidate {
 }
 
 impl Candidate {
+    pub fn search(&self) -> &str {
+        &self.search
+    }
+
     pub fn new(path: PathBuf, root: &Path, directory: bool) -> Self {
         let relative = path.strip_prefix(root).unwrap_or(&path);
         let search = if relative.as_os_str().is_empty() {
