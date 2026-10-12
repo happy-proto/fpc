@@ -25,7 +25,7 @@ fpc                          # Fuzzy-pick a file or directory below the current 
 fpc ./src/main.rs            # Copy a path directly
 fpc --respect-ignore        # Opt in to .gitignore and .ignore rules
 fpc --print ./src/main.rs    # Print the path instead of copying
-fpc --install-completion fish # Install shell completion (also bash and zsh)
+fpc --install-completion     # Auto-detect your shell and install completion
 fpc --help                   # Explore all options
 ```
 

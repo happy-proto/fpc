@@ -25,7 +25,7 @@ fpc                          # 模糊选择当前目录及其子目录中的文�
 fpc ./src/main.rs            # 直接复制路径
 fpc --respect-ignore        # 选择遵循 .gitignore 和 .ignore 规则
 fpc --print ./src/main.rs    # 输出路径，不操作剪贴板
-fpc --install-completion fish # 安装 shell 补全，也支持 bash 和 zsh
+fpc --install-completion     # 自动检测 shell 并安装补全
 fpc --help                   # 查看所有选项
 ```
 
