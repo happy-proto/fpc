@@ -1,0 +1,28 @@
+name: Record build diagnostics
+description: Save compiler cache statistics and Cargo timings for review.
+inputs:
+  name:
+    description: Unique artifact name for this build job.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Record sccache statistics
+      shell: bash
+      run: |
+        mkdir -p build-diagnostics
+        sccache --show-stats --stats-format json > build-diagnostics/sccache.json
+        {
+          echo '### Compiler cache'
+          echo '```text'
+          sccache --show-stats
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        if [ -d target/cargo-timings ]; then
+          cp -R target/cargo-timings build-diagnostics/
+        fi
+    - uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.name }}
+        path: build-diagnostics
+        retention-days: 7

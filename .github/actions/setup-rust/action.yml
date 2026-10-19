@@ -1,0 +1,50 @@
+name: Set up Rust CI
+description: Install the project toolchain and separate download and compiler caches.
+inputs:
+  targets:
+    description: Additional Rust targets to install.
+    default: ''
+  save-downloads:
+    description: Whether this job owns Cargo download cache writes.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        components: rustfmt, clippy
+        targets: ${{ inputs.targets }}
+    # Only trusted main checks write this download-only cache. Cargo verifies registry checksums.
+    - uses: actions/cache@v5 # jactionlint ignore=cache-poisoning
+      if: inputs.save-downloads == 'true'
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+        key: cargo-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: cargo-downloads-v1-${{ runner.os }}-${{ runner.arch }}-
+    - uses: actions/cache/restore@v5 # jactionlint ignore=cache-poisoning
+      if: inputs.save-downloads != 'true'
+      with:
+        path: |
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+        key: cargo-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: cargo-downloads-v1-${{ runner.os }}-${{ runner.arch }}-
+    - uses: mozilla-actions/sccache-action@v0.0.11
+      with:
+        version: v0.18.0
+        disable_annotations: 'true'
+    - name: Configure compiler caching
+      shell: bash
+      env:
+        CACHE_MODE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}
+      run: |
+        echo 'RUSTC_WRAPPER=sccache' >> "$GITHUB_ENV"
+        echo 'CARGO_INCREMENTAL=0' >> "$GITHUB_ENV"
+        echo 'SCCACHE_GHA_ENABLED=true' >> "$GITHUB_ENV"
+        echo "SCCACHE_GHA_RW_MODE=$CACHE_MODE" >> "$GITHUB_ENV"
+        echo 'SCCACHE_GHA_VERSION=fpc-v1' >> "$GITHUB_ENV"
