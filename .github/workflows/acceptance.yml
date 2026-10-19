@@ -8,9 +8,6 @@ on:
 permissions:
   contents: read
 
-# CI owns shared cache writes; acceptance jobs reuse its entries.
-cache-mode: read
-
 defaults:
   run:
     shell: bash
@@ -29,16 +26,13 @@ jobs:
       matrix:
         os: [ubuntu-24.04, macos-15]
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@v5.2.0
+      - uses: jdx/mise-action@v5
         with:
           install_args: uv
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - uses: jdx/mr-boxington-action@v1
+      - uses: $/.github/actions/setup-rust-ci
       - name: Install terminal environment (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -60,7 +54,7 @@ jobs:
           ditto "$RUNNER_TEMP/ghostty-volume/Ghostty.app" "$RUNNER_TEMP/Ghostty.app"
           hdiutil detach "$RUNNER_TEMP/ghostty-volume"
           echo "GHOSTTY_BINARY=$RUNNER_TEMP/Ghostty.app/Contents/MacOS/ghostty" >> "$GITHUB_ENV"
-      - run: mbx build --locked
+      - run: cargo build --locked --timings
       - name: Clipboard acceptance (Linux)
         if: runner.os == 'Linux'
         env:
@@ -75,11 +69,16 @@ jobs:
         run: ./tests/acceptance/clipboard.py target/debug/fpc --artifacts acceptance-artifacts
       - name: Upload terminal diagnostics
         if: always()
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@v7
         with:
           name: terminal-acceptance-${{ matrix.os }}
           path: acceptance-artifacts
           if-no-files-found: ignore
+
+      - uses: $/.github/actions/build-diagnostics
+        if: always()
+        with:
+          name: acceptance-build-${{ matrix.os }}
 
   required:
     name: Terminal acceptance required
