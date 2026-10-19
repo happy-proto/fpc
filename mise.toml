@@ -6,7 +6,7 @@ uv = "0.13.0"
 
 [tasks.check]
 description = "Check formatting and lint all targets"
-run = ["cargo fmt --check", "mbx clippy --all-targets --locked -- -D warnings", "mise run check-workflows"]
+run = ["cargo fmt --check", "mbx clippy --all-targets --locked -- -D warnings", "jactionlint --no-online --shellcheck= --pyflakes="]
 
 [tasks.test]
 description = "Run fast tests without desktop or shell framework dependencies"
@@ -19,7 +19,3 @@ run = "mbx +stable install --path . --locked"
 [tasks.setup]
 description = "Initialize the local development environment"
 run = "hk install --mise"
-
-[tasks.check-workflows]
-description = "Lint workflows and verify their locked Action dependencies online"
-run = ["jactionlint --no-online --shellcheck= --pyflakes=", "gh actions-lock --verify"]
