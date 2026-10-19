@@ -32,7 +32,7 @@ jobs:
       - uses: jdx/mise-action@v5
         with:
           install_args: uv
-      - uses: $/.github/actions/setup-rust
+      - uses: $/.github/actions/setup-rust-ci
       - name: Install terminal environment (Linux)
         if: runner.os == 'Linux'
         run: |
