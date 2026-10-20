@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Prefer case-insensitive prefixes for path completion and fall back to nucleo fuzzy matching. Queries such as `readmemd` and `rdm` can match `README.md`. Search one directory level at a time and show hidden names only for names beginning with `.`.
-- Show Fish path completions in a compact menu below the command line without entering the alternate screen. Preserve the full candidate list and ranking, insert unique matches directly, and leave the original input unchanged when cancelled.
+- Complete path names by case-insensitive prefix, falling back to contiguous substring matches only when no prefixes match. Tab completion stays within the current directory level and only offers hidden names when the name being completed starts with `.`.
 
 ### Added
 

@@ -1,6 +1,5 @@
 mod clipboard;
 mod completion;
-mod completion_menu;
 mod paths;
 mod picker;
 
@@ -65,9 +64,6 @@ struct Cli {
 }
 
 fn run() -> Result<()> {
-    if std::env::var_os("_FPC_COMPLETE").is_some() {
-        return completion::interact();
-    }
     completion::complete();
     let cli = Cli::parse();
     if let Some(shell) = cli.install_completion {

@@ -7,10 +7,6 @@ use clap_complete::{
     CompleteEnv,
     env::{Bash, EnvCompleter, Fish, Shells, Zsh},
 };
-use nucleo_matcher::{
-    Config, Matcher, Utf32Str,
-    pattern::{Atom, AtomKind, CaseMatching, Normalization},
-};
 use std::{
     collections::HashSet,
     env,
@@ -18,7 +14,7 @@ use std::{
     fs, io,
     path::{Path, PathBuf},
     process::Command,
-    sync::{Arc, Mutex},
+    sync::Mutex,
 };
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -30,65 +26,6 @@ pub enum Shell {
 
 const START: &str = "# >>> fpc completion >>>";
 const END: &str = "# <<< fpc completion <<<";
-
-pub fn interact() -> Result<()> {
-    use io::Write;
-
-    let args: Vec<_> = env::args_os().skip(2).collect();
-    let index = args
-        .len()
-        .checked_sub(1)
-        .context("Missing completion arguments")?;
-    let current = &args[index];
-    let completing_option = current.as_encoded_bytes().starts_with(b"--");
-    let inline_value = current.as_encoded_bytes().starts_with(b"--ignore-file=");
-    let request = Arc::new(Mutex::new(None));
-    let mut cmd = command();
-    for (id, files_only) in [("path", false), ("ignore_file", true)] {
-        let request = Arc::clone(&request);
-        cmd = cmd.mut_arg(id, |arg| {
-            arg.add(ArgValueCompleter::new(move |value: &OsStr| {
-                *request.lock().unwrap() = Some((value.to_owned(), files_only));
-                Vec::<CompletionCandidate>::new()
-            }))
-        });
-    }
-    let cwd = env::current_dir()?;
-    let candidates = clap_complete::engine::complete(&mut cmd, args, index, Some(&cwd))?;
-    let request = request.lock().unwrap().take();
-    let mut out = io::stdout().lock();
-    let Some((current, files_only)) =
-        request.filter(|_| !completing_option || candidates.is_empty())
-    else {
-        out.write_all(b"fallback\0")?;
-        return Ok(());
-    };
-    let candidates = if files_only {
-        file_candidates(&current)
-    } else {
-        path_candidates(&current)
-    };
-    let Some(selected) = crate::completion_menu::select(&candidates)? else {
-        out.write_all(b"cancelled\0")?;
-        return Ok(());
-    };
-    let path = Path::new(&selected);
-    let selected = if let Ok(suffix) = path.strip_prefix("~") {
-        env::home_dir()
-            .context("Cannot read home directory")?
-            .join(suffix)
-            .into_os_string()
-    } else {
-        selected
-    };
-    out.write_all(b"selected\0")?;
-    if inline_value {
-        out.write_all(b"--ignore-file=")?;
-    }
-    out.write_all(selected.as_encoded_bytes())?;
-    out.write_all(b"\0")?;
-    Ok(())
-}
 
 pub fn command() -> clap::Command {
     crate::Cli::command()
@@ -143,11 +80,7 @@ impl EnvCompleter for ContextualCompleter {
                     .as_bytes(),
             )
         } else {
-            self.0.write_registration(var, name, bin, completer, buf)?;
-            if self.name() == "fish" {
-                buf.write_all(include_bytes!("completions/fish.fish"))?;
-            }
-            Ok(())
+            self.0.write_registration(var, name, bin, completer, buf)
         }
     }
 
@@ -227,55 +160,60 @@ fn path_candidates(current: &OsStr) -> Vec<CompletionCandidate> {
 
 fn complete_path(current: &OsStr, completer: PathCompleter) -> Vec<CompletionCandidate> {
     let path = Path::new(current);
-    let text = current.to_string_lossy();
-    let (mut directory, query) = if text == "." || text.ends_with("/.") {
-        (PathBuf::from(text.strip_suffix('.').unwrap()), ".".into())
-    } else if !text.ends_with('/')
-        && let Some(name) = path.file_name()
-    {
-        (
-            path.parent().unwrap_or_else(|| Path::new("")).to_owned(),
-            name.to_string_lossy(),
-        )
-    } else {
-        (path.to_owned(), "".into())
-    };
-    directory.push("");
-    // File names are literal fuzzy needles, not the picker's extended search syntax.
-    let pattern = Atom::new(
-        &query,
-        CaseMatching::Ignore,
-        Normalization::Smart,
-        AtomKind::Fuzzy,
-        false,
-    );
-    let mut matcher = Matcher::new(Config::DEFAULT.match_paths());
-    let mut buffer = Vec::new();
-    let prefix = query.to_lowercase();
-    let mut matches: Vec<_> = completer
-        .complete(directory.as_os_str())
+    let trailing_separator = current
+        .as_encoded_bytes()
+        .last()
+        .is_some_and(|byte| std::path::is_separator(*byte as char));
+    if !trailing_separator && let Some(name) = path.file_name().and_then(OsStr::to_str) {
+        // Enumerate only the directory being completed; match its final component ourselves.
+        let parent = path.parent().unwrap_or_else(|| Path::new(""));
+        let mut directory = parent.to_path_buf();
+        directory.push("");
+        let query = name.to_lowercase();
+        let mut prefixes = Vec::new();
+        let mut substrings = Vec::new();
+        for candidate in completer.complete(directory.as_os_str()) {
+            let Some(name) = Path::new(candidate.get_value())
+                .file_name()
+                .and_then(OsStr::to_str)
+            else {
+                continue;
+            };
+            if name.starts_with('.') && !query.starts_with('.') {
+                continue;
+            }
+            let name = name.to_lowercase();
+            if name.starts_with(&query) {
+                prefixes.push(candidate);
+            } else if name.contains(&query) {
+                substrings.push(candidate);
+            }
+        }
+        return if prefixes.is_empty() {
+            substrings
+        } else {
+            prefixes
+        };
+    }
+    let explicit_dot = current == OsStr::new(".");
+    completer
+        .complete(if explicit_dot {
+            OsStr::new("")
+        } else {
+            current
+        })
         .into_iter()
         .filter(|candidate| candidate.get_value() != OsStr::new("."))
-        .filter_map(|candidate| {
-            let name = Path::new(candidate.get_value())
-                .file_name()?
-                .to_string_lossy();
-            if name.starts_with('.') != query.starts_with('.') {
-                return None;
-            }
-            let score = pattern.score(Utf32Str::new(&name, &mut buffer), &mut matcher)?;
-            let is_prefix = name.to_lowercase().starts_with(&prefix);
-            Some((candidate, score, is_prefix))
+        .filter(|candidate| {
+            !candidate.is_hide_set()
+                || explicit_dot
+                || path
+                    .file_name()
+                    .is_some_and(|name| name.to_string_lossy().starts_with('.'))
         })
-        .collect();
-    if matches.iter().any(|(_, _, is_prefix)| *is_prefix) {
-        matches.retain(|(_, _, is_prefix)| *is_prefix);
-    }
-    matches.sort_by_key(|(_, score, _)| std::cmp::Reverse(*score));
-    matches
-        .into_iter()
-        .enumerate()
-        .map(|(index, (candidate, _, _))| candidate.display_order(Some(index)))
+        .filter(|candidate| {
+            !explicit_dot || candidate.get_value().to_string_lossy().starts_with('.')
+        })
         .collect()
 }
 
@@ -348,50 +286,15 @@ pub fn install(shell: Option<Shell>) -> Result<()> {
             "if command -v fpc >/dev/null 2>&1; then\n    eval \"$(COMPLETE=zsh fpc)\"\n    if [[ ${_comps[fpc]} != _fpc && -n ${_comps[fpc]} ]]; then\n        \"${_comps[fpc]}\" \"$@\"\n    fi\nfi",
         ),
     };
-    let header = if matches!(shell, Shell::Zsh) {
-        "#compdef fpc\n"
-    } else {
-        ""
-    };
-    let mut files = vec![prepare_install(path, hook, header)?];
-    if matches!(shell, Shell::Fish) {
-        files.push(prepare_install(
-            env_path("XDG_CONFIG_HOME")
-                .unwrap_or_else(|| home.join(".config"))
-                .join("fish/conf.d/fpc.fish"),
-            "if status is-interactive; and command -q fpc\n    COMPLETE=fish fpc | source\nend",
-            "",
-        )?);
-    }
-    for (path, content) in &files {
-        fs::create_dir_all(path.parent().context("No parent directory")?)?;
-        fs::write(path, content).with_context(|| format!("Cannot write {}", path.display()))?;
-    }
-    eprintln!("Installed completion in:");
-    for (path, _) in &files {
-        eprintln!("{}", path.display());
-    }
-    eprintln!("\nMake sure fpc is on PATH. Existing shell startup files were left untouched.");
-    match shell {
-        Shell::Bash => {
-            eprintln!("Enable bash-completion in your shell, then open a new Bash session.")
-        }
-        Shell::Zsh => {
-            eprintln!(
-                "Add the following directory to fpath before running compinit, then open a new Zsh session:"
-            );
-            eprintln!("{}", files[0].0.parent().unwrap().display());
-        }
-        _ => eprintln!("Open a new Fish session to load the completion."),
-    }
-    Ok(())
-}
-
-fn prepare_install(path: PathBuf, hook: &str, header: &str) -> Result<(PathBuf, String)> {
     let old = match fs::read_to_string(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(error) => return Err(error).with_context(|| format!("Cannot read {}", path.display())),
+    };
+    let header = if matches!(shell, Shell::Zsh) {
+        "#compdef fpc\n"
+    } else {
+        ""
     };
     if !old.is_empty() && !old.starts_with(&format!("{header}{START}\n")) {
         bail!(
@@ -400,5 +303,25 @@ fn prepare_install(path: PathBuf, hook: &str, header: &str) -> Result<(PathBuf, 
         );
     }
     let new = format!("{header}{START}\n{hook}\n{END}\n");
-    Ok((path, new))
+    if new != old {
+        fs::create_dir_all(path.parent().context("No parent directory")?)?;
+        fs::write(&path, new).with_context(|| format!("Cannot write {}", path.display()))?;
+    }
+    eprintln!(
+        "Installed completion in:\n{}\n\nMake sure fpc is on PATH. Shell startup files were left untouched.",
+        path.display()
+    );
+    match shell {
+        Shell::Bash => {
+            eprintln!("Enable bash-completion in your shell, then open a new Bash session.")
+        }
+        Shell::Zsh => {
+            eprintln!(
+                "Add the following directory to fpath before running compinit, then open a new Zsh session:"
+            );
+            eprintln!("{}", path.parent().unwrap().display());
+        }
+        _ => eprintln!("Open a new Fish session to load the completion."),
+    }
+    Ok(())
 }

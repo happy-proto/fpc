@@ -121,7 +121,7 @@ fn tab_completion_only_offers_paths_without_a_current_directory_entry() {
 }
 
 #[test]
-fn tab_completion_prefers_case_insensitive_prefixes_then_fuzzy_matches() {
+fn tab_completion_prefers_case_insensitive_prefixes_then_contiguous_substrings() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
     for name in [
@@ -129,7 +129,6 @@ fn tab_completion_prefers_case_insensitive_prefixes_then_fuzzy_matches() {
         "README.zh-CN.md",
         "old-readme.txt",
         ".readme-secret",
-        "^report!.txt",
     ] {
         fs::write(root.join(name), "").unwrap();
     }
@@ -146,11 +145,8 @@ fn tab_completion_prefers_case_insensitive_prefixes_then_fuzzy_matches() {
                     vec!["old-readme", ".readme-secret", "docs/"],
                 ),
                 ("zh", vec!["README.zh-CN.md"], vec!["README.md"]),
-                ("rdm", vec!["README.md"], vec![]),
-                ("readmemd", vec!["README.md", "README.zh-CN.md"], vec![]),
-                ("READMEMD", vec!["README.md"], vec![]),
-                ("docs/readmemd", vec!["docs/README.md"], vec![]),
-                ("^report!", vec!["^report!.txt"], vec![]),
+                ("rdm", vec![], vec!["README", "readme"]),
+                ("readmemd", vec![], vec!["README", "readme"]),
                 ("docs/readme", vec!["docs/README.md"], vec![]),
                 ("./readme", vec!["./README.md"], vec!["old-readme"]),
                 ("DOC", vec!["docs/"], vec!["README"]),
@@ -172,12 +168,6 @@ fn tab_completion_prefers_case_insensitive_prefixes_then_fuzzy_matches() {
                 let output = command.arg(query).output().unwrap();
                 assert!(output.status.success(), "{shell}: {output:?}");
                 let results = String::from_utf8(output.stdout).unwrap();
-                if query == "readmemd" {
-                    assert!(
-                        results.find("README.md").unwrap()
-                            < results.find("README.zh-CN.md").unwrap()
-                    );
-                }
                 if expected.is_empty() {
                     assert!(
                         results.is_empty(),
@@ -278,23 +268,6 @@ fn completion_install_is_idempotent_and_respects_config_locations() {
             .status
             .success()
     );
-}
-
-#[test]
-fn fish_install_checks_the_startup_snippet_before_writing_completion() {
-    let temp = tempfile::tempdir().unwrap();
-    let config = temp.path().join("config");
-    let snippet = config.join("fish/conf.d/fpc.fish");
-    fs::create_dir_all(snippet.parent().unwrap()).unwrap();
-    fs::write(&snippet, "# unrelated config\n").unwrap();
-    let output = cli(temp.path())
-        .env("XDG_CONFIG_HOME", &config)
-        .args(["--install-completion", "fish"])
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    assert!(!config.join("fish/completions/fpc.fish").exists());
-    assert_eq!(fs::read_to_string(snippet).unwrap(), "# unrelated config\n");
 }
 
 #[test]
