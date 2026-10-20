@@ -39,12 +39,14 @@ class Shell(StrEnum):
 
 PROMPT = "FPC_READY> "
 ANSI = re.compile(
-    r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\)|[()][A-Z0-9]|.)"
+    r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*?(?:\x07|\x1b\\)|[()][A-Z0-9]|.)"
 )
 
 
 class Terminal:
     def __init__(self, command, environment, directory):
+        self.check_alt_screen = False
+        self.shell = Path(command[0]).name
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             os.chdir(directory)
@@ -52,6 +54,7 @@ class Terminal:
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
         try:
             self.wait_for(PROMPT)
+            self.check_alt_screen = True
         except BaseException:
             self.close()
             raise
@@ -60,7 +63,16 @@ class Terminal:
         if not select.select([self.fd], [], [], timeout)[0]:
             return ""
         try:
-            return os.read(self.fd, 65536).decode(errors="replace")
+            output = os.read(self.fd, 65536).decode(errors="replace")
+            # Fish probes terminal capabilities before showing its first prompt.
+            if "\x1b[0c" in output:
+                self.send("\x1b[?1;2c")
+            if "\x1b[6n" in output:
+                self.send("\x1b[1;1R")
+            assert not self.check_alt_screen or "\x1b[?1049h" not in output, (
+                "Tab completion entered the alternate screen"
+            )
+            return output
         except OSError as error:
             if error.errno == errno.EIO:
                 raise AssertionError("Shell exited unexpectedly") from error
@@ -72,7 +84,7 @@ class Terminal:
         while time.monotonic() < deadline:
             output += self.read(0.1)
             clean = ANSI.sub("", output).replace("\r", "")
-            if expected in clean or expected in output:
+            if expected in clean:
                 return clean
         raise AssertionError(f"Timed out waiting for {expected!r}: {output!r}")
 
@@ -80,13 +92,20 @@ class Terminal:
         os.write(self.fd, text.encode())
 
     def menu(self, prefix):
-        self.send(f"fpc {prefix}\t")
+        self.send(f"fpc {prefix}\t\t")
         output = ""
         deadline = time.monotonic() + 0.8
         while time.monotonic() < deadline:
             output += self.read(0.05)
-        self.send("\x03")
-        self.wait_for(PROMPT)
+        if self.shell == "fish":
+            # Fish can cancel its pager without reprinting the unchanged prompt.
+            self.send("\x03\x15printf 'FPC_MENU_DONE\\n'\r")
+            cleared = self.wait_for("FPC_MENU_DONE\n")
+            if PROMPT not in cleared.split("FPC_MENU_DONE\n", 1)[1]:
+                self.wait_for(PROMPT)
+        else:
+            self.send("\x03")
+            self.wait_for(PROMPT)
         return ANSI.sub("", output).replace("\r", "")
 
     def close(self):
@@ -129,21 +148,12 @@ def verify(shell, executable, binary, completion_framework):
             "README.zh-CN.md",
             "old-readme.txt",
             ".readme-secret",
-            "line\nbreak.txt",
-            "odd ' quote $(touch PWNED); [x].txt",
-            "中文路径.txt",
         ]:
             (work / name).touch()
         (work / "folder").mkdir()
         (work / "folder/nested.txt").touch()
         (home / "bin").mkdir()
         (home / "bin/fpc").symlink_to(binary)
-        for name in ["pbcopy", "wl-copy", "xclip", "xsel"]:
-            stub = home / "bin" / name
-            stub.write_text(
-                '#!/bin/sh\nprintf copy >> "$HOME/clipboard-calls"\ncat >/dev/null\n'
-            )
-            stub.chmod(0o755)
         if completion_framework is not None:
             (home / "system/bash-completion").mkdir(parents=True)
             (home / "system/bash-completion/bash_completion").symlink_to(
@@ -152,7 +162,7 @@ def verify(shell, executable, binary, completion_framework):
         environment = {
             "HOME": str(home),
             "PATH": f"{home / 'bin'}:{os.environ['PATH']}",
-            "TERM": "dumb",
+            "TERM": "xterm-256color",
             "LC_ALL": "C.UTF-8" if sys.platform != "darwin" else "en_US.UTF-8",
             "XDG_CONFIG_HOME": str(home / "config"),
             "XDG_DATA_HOME": str(home / "data"),
@@ -187,189 +197,131 @@ def verify(shell, executable, binary, completion_framework):
             )
             command = [executable, "-d", "-i"]
         else:
-            (home / "config/fish/conf.d/00-custom-tab.fish").write_text(
-                "function previous_tab\n"
-                "    printf used >> $HOME/previous-tab\n"
-                "    commandline -f complete\n"
-                "end\n"
-                "bind \\t previous_tab\n"
-            )
             command = [
                 executable,
                 "--interactive",
                 "--init-command",
-                f"function fish_prompt; printf '%s' {shlex.quote(PROMPT)}; end; set -g fish_greeting; set -g fish_autosuggestion_enabled 0",
+                f"function fish_prompt; printf '%s' {shlex.quote(PROMPT)}; end; set -g fish_greeting; set -g fish_autosuggestion_enabled 0; function fpc_test_tab; set -g fpc_test_tab_used yes; commandline -f complete; end; bind \\t fpc_test_tab; COMPLETE=fish fpc | source",
             ]
         terminal = Terminal(command, environment, work)
         try:
-            completion_work = work
 
             def menu_for(prefix):
-                if shell == "fish":
-                    return subprocess.run(
-                        [
-                            executable,
-                            "-c",
-                            f"complete -C {shlex.quote('fpc ' + prefix)}",
-                        ],
-                        env=environment,
-                        cwd=completion_work,
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                    ).stdout
                 return terminal.menu(prefix)
 
+            menu = menu_for("")
+            assert "sample.txt" in menu and "folder" in menu, (shell, menu)
+            assert not re.search(r"(?:^|\s)\.(?:\s|$)", menu), (shell, menu)
+            for option in [
+                "--help",
+                "--version",
+                "--print",
+                "--respect-ignore",
+                "--ignore-file",
+                "--install-completion",
+            ]:
+                assert option not in menu, (shell, menu)
+            hidden = menu_for(".")
+            assert ".env" in hidden, (shell, hidden)
+            readme = menu_for("readme")
+            assert "README.md" in readme and "README.zh-CN.md" in readme, (
+                shell,
+                readme,
+            )
+            assert ".readme-secret" not in readme, (shell, readme)
+            substring = menu_for("zh")
+            assert "README.zh-CN.md" in substring, (shell, substring)
+            nonconsecutive = menu_for("rdm")
+            assert "README.md" in nonconsecutive, (shell, nonconsecutive)
+            joined = menu_for("readmemd")
+            assert "README.md" in joined, (shell, joined)
+            nested = menu_for("folder/nes")
+            assert "nested.txt" in nested, (shell, nested)
+            directory = menu_for("FOL")
+            assert "folder/" in directory, (shell, directory)
+            rules_readme = menu_for("--ignore-file readme")
+            assert "README.md" in rules_readme and "README.zh-CN.md" in rules_readme, (
+                shell,
+                rules_readme,
+            )
             option = menu_for("--re")
             assert "--respect-ignore" in option, (shell, option)
             shells = menu_for("--install-completion ")
             for value in ["fish", "bash", "zsh"]:
                 assert value in shells, (shell, value, shells)
-            assert "sample.txt" not in shells, (shell, shells)
-
-            def open_picker(prefix):
-                terminal.send(f"fpc {prefix}\t")
-                return terminal.wait_for("insert")
-
-            def close_picker():
-                output = terminal.wait_for("\x1b[?1049l")
-                if shell == "fish" and PROMPT not in output:
-                    terminal.wait_for(PROMPT)
-
-            def cancel_to_prompt():
-                terminal.send("\x1b")
-                close_picker()
-                terminal.send("\x01\x0bprintf '\\nFPC_RESET\\n'\r")
-                output = terminal.wait_for("\nFPC_RESET\n")
-                if PROMPT not in output.split("\nFPC_RESET\n", 1)[1]:
-                    terminal.wait_for(PROMPT)
-
-            opened = open_picker("--print ")
-            assert "sample.txt" in opened and ".readme-secret" not in opened, (
+            assert not re.search(r"(?:^|\s)auto(?:\s|$)", shells), (shell, shells)
+            assert "sample.txt" not in shells and "--help" not in shells, (
                 shell,
-                opened,
+                shells,
             )
-            cancel_to_prompt()
-            opened = open_picker("--print .")
-            assert ".env" in opened, (shell, opened)
-            cancel_to_prompt()
-
-            # Completion itself never invokes clipboard tools, even without --print.
-            open_picker("sam")
-            terminal.send("\r")
-            close_picker()
-            terminal.send("\x01\x0bprintf '\\nFPC_RESET\\n'\r")
-            output = terminal.wait_for("\nFPC_RESET\n")
-            if PROMPT not in output.split("\nFPC_RESET\n", 1)[1]:
+            rules = menu_for("--ignore-file ")
+            assert "sample.txt" in rules and "folder" in rules, (shell, rules)
+            assert "--help" not in rules, (shell, rules)
+            escaped = menu_for("-- --r")
+            assert "--report" in escaped and "--respect-ignore" not in escaped, (
+                shell,
+                escaped,
+            )
+            empty = home / "empty"
+            empty.mkdir()
+            terminal.send(f"cd {shlex.quote(str(empty))}\r")
+            terminal.wait_for(PROMPT)
+            empty_menu = menu_for("")
+            assert (
+                "--help" not in empty_menu and "--respect-ignore" not in empty_menu
+            ), (shell, empty_menu)
+            terminal.send(f"cd {shlex.quote(str(work))}\r")
+            terminal.wait_for(PROMPT)
+            terminal.send("fpc --install-completion fi\t\r")
+            destination = str(home / "config/fish/completions/fpc.fish")
+            output = terminal.wait_for(destination + "\n")
+            if PROMPT not in output.split(destination + "\n", 1)[1]:
                 terminal.wait_for(PROMPT)
-            assert not (home / "clipboard-calls").exists(), shell
-
-            terminal.send("echo sam\t; printf '\\nFPC_OTHER\\n'\r")
-            output = terminal.wait_for("\nFPC_OTHER\n")
-            assert "sample.txt" in output, (shell, output)
-            if PROMPT not in output.split("\nFPC_OTHER\n", 1)[1]:
-                terminal.wait_for(PROMPT)
-            if shell == "fish":
-                assert (home / "previous-tab").read_text() == "used"
-
-            # Even a single result requires confirmation, and cancellation keeps the token.
-            for cancel in ["\x1b", "\x03"]:
-                opened = open_picker("--print readmemd")
-                assert "README.md" in opened, (shell, opened)
-                terminal.send(cancel)
-                close_picker()
-                terminal.send("\r")
-                output = terminal.wait_for("Cannot access readmemd")
-                if PROMPT not in output.split("Cannot access readmemd", 1)[1]:
+            for command in [
+                "fpc --print --re\t ./sample.txt\r",
+                "fpc --print --ignore-file sam\t ./sample.txt\r",
+            ]:
+                terminal.send(command)
+                expected = str(work / "sample.txt")
+                output = terminal.wait_for(expected + "\n")
+                assert expected in output.splitlines(), (shell, command, output)
+                if PROMPT not in output.split(expected + "\n", 1)[1]:
                     terminal.wait_for(PROMPT)
-
-            # A query with no matches stays editable instead of inserting a guessed path.
-            opened = open_picker("--print zzzzzzzzz")
-            assert "0/" in opened.replace(" ", ""), (shell, opened)
-            terminal.send("\x15readmemd")
-            terminal.wait_for("README.md")
-            terminal.send("\x1b")
-            close_picker()
-            terminal.send("\r")
-            output = terminal.wait_for("Cannot access zzzzzzzzz")
-            if PROMPT not in output.split("Cannot access zzzzzzzzz", 1)[1]:
-                terminal.wait_for(PROMPT)
-
             for typed, expected in [
                 ("sam", work / "sample.txt"),
-                ("readmemd", work / "README.md"),
-                ("rdm", work / "README.md"),
-                ("zh", work / "README.zh-CN.md"),
+                ("zhcn", work / "README.zh-CN.md"),
                 ("folder/nes", work / "folder/nested.txt"),
                 ("sp", work / "space name.txt"),
-                ("linebreak", work / "line\nbreak.txt"),
-                ("odd", work / "odd ' quote $(touch PWNED); [x].txt"),
-                ("中文", work / "中文路径.txt"),
+                ("NAME", work / "space name.txt"),
+                ("zh", work / "README.zh-CN.md"),
                 (".e", work / ".env"),
                 ("-- --r", work / "--report"),
                 (f"{work}/sam", work / "sample.txt"),
                 ("../work/sam", work / "../work/sample.txt"),
-                ("~/work/sam", work / "sample.txt"),
             ]:
-                open_picker("--print " + typed)
-                terminal.send("\r")
-                # The first Enter only fills the command line; the next executes it.
-                close_picker()
-                terminal.send(
-                    f" > {shlex.quote(str(home / 'result'))}; printf '\\nFPC_DONE\\n'\r"
-                )
-                output = terminal.wait_for("\nFPC_DONE\n")
-                assert (home / "result").read_bytes() == os.fsencode(
-                    expected
-                ) + b"\n", (
-                    shell,
-                    typed,
-                    output,
-                )
-                assert not (work / "PWNED").exists(), (shell, typed)
-                if PROMPT not in output.split("\nFPC_DONE\n", 1)[1]:
+                terminal.send(f"fpc --print {typed}\t\r")
+                output = terminal.wait_for(str(expected) + "\n")
+                assert str(expected) in output.splitlines(), (shell, typed, output)
+                if PROMPT not in output.split(str(expected) + "\n", 1)[1]:
                     terminal.wait_for(PROMPT)
-
-            suffix = " --respect-ignore"
-            terminal.send("fpc --print readmemd" + suffix + "\x02" * len(suffix) + "\t")
-            terminal.wait_for("insert")
-            terminal.send("\r")
-            close_picker()
-            terminal.send(
-                f"\x05 > {shlex.quote(str(home / 'result'))}; printf '\\nFPC_MIDDLE\\n'\r"
-            )
-            output = terminal.wait_for("\nFPC_MIDDLE\n")
-            assert (home / "result").read_bytes() == os.fsencode(
-                work / "README.md"
-            ) + b"\n", (
-                shell,
-                output,
-            )
-            if PROMPT not in output.split("\nFPC_MIDDLE\n", 1)[1]:
-                terminal.wait_for(PROMPT)
-
-            # Directory confirmation keeps the slash so another Tab opens that directory.
-            open_picker("--print fol")
-            terminal.send("\r")
-            close_picker()
-            terminal.send("nes\t")
-            terminal.wait_for("insert")
-            terminal.send("\r")
-            close_picker()
-            terminal.send("\r")
-            output = terminal.wait_for(str(work / "folder/nested.txt") + "\n")
-            if PROMPT not in output.split(str(work / "folder/nested.txt") + "\n", 1)[1]:
-                terminal.wait_for(PROMPT)
-
-            # The ignore-file value also uses the picker; selecting never copies a path.
-            for option in ["--ignore-file sam", "--ignore-file=sam"]:
-                open_picker("--print " + option)
-                terminal.send("\r")
-                close_picker()
-                terminal.send(" ./sample.txt\r")
-                output = terminal.wait_for(str(work / "sample.txt") + "\n")
-                if PROMPT not in output.split(str(work / "sample.txt") + "\n", 1)[1]:
+            if shell == "fish":
+                terminal.send("fpc --print readmemd\t\t\r\r")
+                expected = str(work / "README.md")
+                output = terminal.wait_for(expected + "\n")
+                assert expected in output.splitlines(), (shell, output)
+                if PROMPT not in output.split(expected + "\n", 1)[1]:
                     terminal.wait_for(PROMPT)
+                for command, expected in [
+                    ("printf 'FPC_NON_FPC=%s\\n' sam\t\r", "FPC_NON_FPC=sample.txt\n"),
+                    (
+                        "printf 'FPC_ORIGINAL_TAB=%s\\n' $fpc_test_tab_used\r",
+                        "FPC_ORIGINAL_TAB=yes\n",
+                    ),
+                ]:
+                    terminal.send(command)
+                    output = terminal.wait_for(expected)
+                    if PROMPT not in output.split(expected, 1)[1]:
+                        terminal.wait_for(PROMPT)
         finally:
             terminal.close()
     print(

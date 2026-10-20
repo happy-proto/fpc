@@ -7,6 +7,10 @@ use clap_complete::{
     CompleteEnv,
     env::{Bash, EnvCompleter, Fish, Shells, Zsh},
 };
+use nucleo_matcher::{
+    Config, Matcher, Utf32Str,
+    pattern::{Atom, AtomKind, CaseMatching, Normalization},
+};
 use std::{
     collections::HashSet,
     env,
@@ -14,7 +18,7 @@ use std::{
     fs, io,
     path::{Path, PathBuf},
     process::Command,
-    sync::{Arc, Mutex},
+    sync::Mutex,
 };
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -26,95 +30,6 @@ pub enum Shell {
 
 const START: &str = "# >>> fpc completion >>>";
 const END: &str = "# <<< fpc completion <<<";
-
-// Shell adapters exchange NUL-delimited records so file names remain data, including newlines.
-pub fn interact() -> Result<()> {
-    use std::io::Write;
-
-    let args: Vec<_> = env::args_os().skip(2).collect();
-    let index = env::var("_CLAP_COMPLETE_INDEX")
-        .context("Missing completion cursor index")?
-        .parse::<usize>()?;
-    let request = Arc::new(Mutex::new(None));
-    let mut cmd = command();
-    for id in ["path", "ignore_file"] {
-        let request = Arc::clone(&request);
-        cmd = cmd.mut_arg(id, |arg| {
-            arg.add(ArgValueCompleter::new(move |value: &OsStr| {
-                *request.lock().unwrap() = Some(value.to_owned());
-                Vec::<CompletionCandidate>::new()
-            }))
-        });
-    }
-    let cwd = env::current_dir()?;
-    let completing_options = args
-        .get(index)
-        .is_some_and(|value| value.as_encoded_bytes().starts_with(b"--"));
-    let inline_value = args
-        .get(index)
-        .is_some_and(|value| value.as_encoded_bytes().starts_with(b"--ignore-file="));
-    let candidates = clap_complete::engine::complete(&mut cmd, args, index, Some(&cwd))?;
-    let current = request.lock().unwrap().take();
-    let mut out = io::stdout().lock();
-    let Some(current) = current.filter(|_| !completing_options || candidates.is_empty()) else {
-        out.write_all(b"fallback\0")?;
-        return Ok(());
-    };
-    let path = Path::new(&current);
-    let text = current.to_string_lossy();
-    let (directory, query) = if text == "." || text.ends_with("/.") {
-        (
-            PathBuf::from(text.strip_suffix('.').unwrap()),
-            ".".to_owned(),
-        )
-    } else if !text.ends_with('/')
-        && let Some(name) = path.file_name()
-    {
-        (
-            path.parent().unwrap_or_else(|| Path::new("")).to_owned(),
-            name.to_string_lossy().into_owned(),
-        )
-    } else {
-        (path.to_owned(), String::new())
-    };
-    let mut prefix = directory.clone();
-    prefix.push("");
-    let entries = PathCompleter::any()
-        .complete(prefix.as_os_str())
-        .into_iter()
-        .filter(|candidate| candidate.get_value() != OsStr::new("."))
-        .map(|candidate| {
-            let path = PathBuf::from(candidate.get_value());
-            let directory_entry = candidate.get_value().as_encoded_bytes().ends_with(b"/");
-            crate::paths::Candidate::new(path, &directory, directory_entry)
-        })
-        .collect();
-    match crate::picker::complete(entries, &query)? {
-        Some(path) => {
-            let path = if let Ok(suffix) = path.strip_prefix("~") {
-                env::home_dir()
-                    .context("Cannot read home directory")?
-                    .join(suffix)
-            } else {
-                path
-            };
-            out.write_all(b"selected\0")?;
-            if inline_value {
-                out.write_all(b"--ignore-file=")?;
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::ffi::OsStrExt;
-                out.write_all(path.as_os_str().as_bytes())?;
-            }
-            #[cfg(not(unix))]
-            out.write_all(path.to_str().context("Path is not Unicode")?.as_bytes())?;
-            out.write_all(b"\0")?;
-        }
-        None => out.write_all(b"cancelled\0")?,
-    }
-    Ok(())
-}
 
 pub fn command() -> clap::Command {
     crate::Cli::command()
@@ -156,14 +71,25 @@ impl EnvCompleter for ContextualCompleter {
         completer: &str,
         buf: &mut dyn io::Write,
     ) -> io::Result<()> {
-        self.0.write_registration(var, name, bin, completer, buf)?;
-        let script = match self.name() {
-            "bash" => include_str!("completions/bash.bash"),
-            "fish" => include_str!("completions/fish.fish"),
-            "zsh" => include_str!("completions/zsh.zsh"),
-            _ => unreachable!(),
-        };
-        buf.write_all(script.as_bytes())
+        if self.name() == "zsh" {
+            let mut registration = Vec::new();
+            self.0
+                .write_registration(var, name, bin, completer, &mut registration)?;
+            // Candidates are already matched by fpc. Zsh must not apply prefix matching again.
+            let script = String::from_utf8(registration).map_err(io::Error::other)?;
+            buf.write_all(
+                script
+                    .replace("'values' dirs", "'values' dirs -U")
+                    .replace("'values' other", "'values' other -U")
+                    .as_bytes(),
+            )
+        } else {
+            self.0.write_registration(var, name, bin, completer, buf)?;
+            if self.name() == "fish" {
+                buf.write_all(include_bytes!("completions/fish.fish"))?;
+            }
+            Ok(())
+        }
     }
 
     fn write_complete(
@@ -241,18 +167,56 @@ fn path_candidates(current: &OsStr) -> Vec<CompletionCandidate> {
 }
 
 fn complete_path(current: &OsStr, completer: PathCompleter) -> Vec<CompletionCandidate> {
-    let explicit_dot = current == OsStr::new(".");
-    completer
-        .complete(if explicit_dot {
-            OsStr::new("")
-        } else {
-            current
-        })
+    let path = Path::new(current);
+    let text = current.to_string_lossy();
+    let (mut directory, query) = if text == "." || text.ends_with("/.") {
+        (PathBuf::from(text.strip_suffix('.').unwrap()), ".".into())
+    } else if !text.ends_with('/')
+        && let Some(name) = path.file_name()
+    {
+        (
+            path.parent().unwrap_or_else(|| Path::new("")).to_owned(),
+            name.to_string_lossy(),
+        )
+    } else {
+        (path.to_owned(), "".into())
+    };
+    directory.push("");
+    // File names are literal fuzzy needles, not the picker's extended search syntax.
+    let pattern = Atom::new(
+        &query,
+        CaseMatching::Ignore,
+        Normalization::Smart,
+        AtomKind::Fuzzy,
+        false,
+    );
+    let mut matcher = Matcher::new(Config::DEFAULT.match_paths());
+    let mut buffer = Vec::new();
+    let prefix = query.to_lowercase();
+    let mut matches: Vec<_> = completer
+        .complete(directory.as_os_str())
         .into_iter()
         .filter(|candidate| candidate.get_value() != OsStr::new("."))
-        .filter(|candidate| {
-            !explicit_dot || candidate.get_value().to_string_lossy().starts_with('.')
+        .filter_map(|candidate| {
+            let name = Path::new(candidate.get_value())
+                .file_name()?
+                .to_string_lossy();
+            if name.starts_with('.') != query.starts_with('.') {
+                return None;
+            }
+            let score = pattern.score(Utf32Str::new(&name, &mut buffer), &mut matcher)?;
+            let is_prefix = name.to_lowercase().starts_with(&prefix);
+            Some((candidate, score, is_prefix))
         })
+        .collect();
+    if matches.iter().any(|(_, _, is_prefix)| *is_prefix) {
+        matches.retain(|(_, _, is_prefix)| *is_prefix);
+    }
+    matches.sort_by_key(|(_, score, _)| std::cmp::Reverse(*score));
+    matches
+        .into_iter()
+        .enumerate()
+        .map(|(index, (candidate, _, _))| candidate.display_order(Some(index)))
         .collect()
 }
 

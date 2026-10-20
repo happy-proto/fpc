@@ -31,9 +31,9 @@ fpc --help                   # Explore all options
 
 Hidden files and ignored paths are included by default.
 
-Tab on a path opens the fuzzy picker with the current name as its query. For example, `readmemd<Tab>` and `rdm<Tab>` can find `README.md`. Edit the query or use the arrow keys to select, then press Enter to insert the path; this does not execute the command or copy anything. Even a single match needs confirmation. Esc or Ctrl+C cancels without changing the command line. Completion searches one directory level at a time, retains a selected directory's trailing `/`, and requires a leading `.` in the query to show hidden names. Options and shell names still use ordinary shell completion.
+Path Tab completion uses your shell's ordinary completion menu. It prefers case-insensitive prefixes and falls back to nucleo fuzzy matching when no prefixes match, so `readmemd<Tab>` and `rdm<Tab>` can find `README.md`. fpc returns candidates in score order; the shell controls their final presentation and may insert a unique match immediately. Completion searches one directory level at a time and requires a leading `.` to show hidden names. Options and shell names also retain ordinary completion. Tab does not open fpc's picker or change the clipboard.
 
-After upgrading, run `fpc --install-completion` and open a new shell. Fish also installs a managed `conf.d/fpc.fish` snippet so its Tab binding is ready before the first completion; other commands retain their previous Tab binding.
+Fish uses a small Tab adapter to align the query's casing with the top candidate before invoking your existing Tab binding. This lets its native, case-sensitive subsequence filter accept queries such as `readmemd` for `README.md`. Fish still applies its own match-quality rules, so its visible results can differ from fpc's full candidate list. `--install-completion fish` installs a managed `conf.d/fpc.fish` snippet to load the adapter at startup; other commands keep their existing Tab behavior.
 
 The picker highlights the characters that matched your query, even when they are spread across the path, and scrolls long results to reveal the matching region. Type `'dcjanus` (a single leading quote) to require the continuous substring `dcjanus`; plain `dcjanus` uses fuzzy matching.
 

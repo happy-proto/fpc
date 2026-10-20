@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Open an interactive fuzzy picker for path Tab completion in Bash, Fish, and Zsh, seeded with the current file name. Enter inserts the selection without executing the command or copying; Esc and Ctrl+C preserve the original input. Search one directory level at a time and show hidden names only for queries beginning with `.`. Options and shell names retain ordinary completion.
+- Complete paths through the shell's native menu, preferring case-insensitive prefixes and falling back to nucleo fuzzy matching. Queries such as `readmemd` and `rdm` can match `README.md`. Search one directory level at a time and show hidden names only for names beginning with `.`.
 
 ### Added
 

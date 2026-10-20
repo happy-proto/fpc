@@ -1,3 +1,7 @@
+if not status is-interactive
+    return
+end
+
 function _fpc_previous_tab
     set -l saved _fpc_tab_$fish_bind_mode
     for action in $$saved
@@ -9,24 +13,31 @@ function _fpc_previous_tab
     end
 end
 
-function _fpc_interactive
+function _fpc_native_tab
     set -l words (commandline --current-process --tokens-expanded --cut-at-cursor)
-    if not contains -- "$words[1]" fpc
-        _fpc_previous_tab
-        return
-    end
     set -l current (commandline --current-token --tokens-expanded | string collect)
-    set -l result (env _FPC_COMPLETE=1 _CLAP_COMPLETE_INDEX=(count $words) fpc -- $words "$current" | string split0)
-    switch "$result[1]"
-        case fallback
-            commandline -f complete
-        case selected
-            commandline --current-token --replace -- (string escape -- "$result[2]")
-            commandline -f repaint
-        case '*'
-            commandline -f repaint
+    if test "$words[1]" = fpc; and test -n "$current"; and not commandline --paging-mode
+        set -l candidates (COMPLETE=fish command fpc -- $words "$current")
+        if set -q candidates[1]
+            set -l first (string split --max 1 \t -- "$candidates[1]")[1]
+            # Fish's subsequence filter is case-sensitive. Use the top candidate's
+            # casing for the same query, then let the existing Tab binding complete it.
+            set -l pattern ''
+            for character in (string split '' -- "$current")
+                set pattern "$pattern(?>.*?("(string escape --style=regex -- "$character")"))"
+            end
+            set -l matched (string match --ignore-case --regex --groups-only -- "$pattern" "$first")
+            if test (count $matched) -eq (string length -- "$current")
+                set -l canonical (string join '' -- $matched)
+                if test "$canonical" != "$current"
+                    commandline --current-token --replace -- (string escape -- "$canonical")
+                end
+            end
+        end
     end
+    _fpc_previous_tab
 end
+
 for mode in default insert
     if not contains -- $mode (bind --list-modes)
         continue
@@ -37,13 +48,16 @@ for mode in default insert
     end
     printf '%s\n' $binding | read --tokenize --array parts
     set -l key_index (contains --index -- tab $parts)
+    if test -z "$key_index"
+        set key_index (contains --index -- \t $parts)
+    end
     if test -n "$key_index"
         set -l actions $parts[(math $key_index + 1)..-1]
-        if not contains -- _fpc_interactive $actions
+        if not contains -- _fpc_native_tab $actions
             set -g _fpc_tab_$mode $actions
         end
     else
         set -g _fpc_tab_$mode complete
     end
-    bind -M $mode \t _fpc_interactive
+    bind -M $mode \t _fpc_native_tab
 end
