@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Complete path names by case-insensitive prefix, falling back to contiguous substring matches only when no prefixes match. Tab completion stays within the current directory level and only offers hidden names when the name being completed starts with `.`.
+- Match paths by case-insensitive prefix, falling back to contiguous substrings.
 
 ### Added
 

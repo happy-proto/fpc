@@ -31,8 +31,6 @@ fpc --help                   # Explore all options
 
 Hidden files and ignored paths are included by default.
 
-Tab completion matches file and directory names by case-insensitive prefix, falling back to case-insensitive contiguous substrings only when there are no prefix matches. For example, `readme<Tab>` matches `README.md`, and `zh<Tab>` can match `README.zh-CN.md`. It completes one directory level at a time and requires a leading `.` to offer hidden names. Nonconsecutive matching is reserved for the picker.
-
 The picker highlights the characters that matched your query, even when they are spread across the path, and scrolls long results to reveal the matching region. Type `'dcjanus` (a single leading quote) to require the continuous substring `dcjanus`; plain `dcjanus` uses fuzzy matching.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions, [RELEASE.md](RELEASE.md) for the release procedure, and [CHANGELOG.md](CHANGELOG.md) for changes.
