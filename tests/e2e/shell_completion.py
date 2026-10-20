@@ -295,6 +295,20 @@ def verify(shell, executable, binary, completion_framework):
             ]
         terminal = Terminal(command, environment, work)
         try:
+            if shell == "fish":
+                terminal.send("fpc --print readmemd\t")
+                terminal.wait_screen(
+                    lambda rows: any("Enter insert" in row for row in rows)
+                )
+                assert any(
+                    "FPC_READY> fpc --print readmemd" in row
+                    for row in terminal.screen.display
+                ), terminal.screen.display
+                terminal.send("\x1b")
+                terminal.wait_screen(
+                    lambda rows: not any("Enter insert" in row for row in rows)
+                )
+                terminal.clear_line()
 
             def menu_for(prefix):
                 return terminal.menu(prefix)

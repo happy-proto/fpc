@@ -53,5 +53,5 @@ for mode in default insert
     else
         set -g _fpc_tab_$mode complete
     end
-    bind -M $mode \t _fpc_inline_tab
+    bind -M $mode \t repaint _fpc_inline_tab
 end
