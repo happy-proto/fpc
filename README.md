@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/happy-proto/fpc/actions/workflows/ci.yml/badge.svg)](https://github.com/happy-proto/fpc/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/fpc.svg)](https://crates.io/crates/fpc)
+[![Dependencies](https://deps.rs/repo/github/happy-proto/fpc/status.svg)](https://deps.rs/repo/github/happy-proto/fpc)
 
 [简体中文](README.zh-CN.md)
 
