@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Match paths by case-insensitive prefix, falling back to contiguous substrings.
+- Match Tab completions by case-insensitive prefix, falling back to contiguous substrings.
 
 ### Added
 

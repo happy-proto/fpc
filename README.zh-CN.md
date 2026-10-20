@@ -2,13 +2,19 @@
 
 [![CI](https://github.com/happy-proto/fpc/actions/workflows/ci.yml/badge.svg)](https://github.com/happy-proto/fpc/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/fpc.svg)](https://crates.io/crates/fpc)
-[![Dependencies](https://deps.rs/repo/github/happy-proto/fpc/status.svg)](https://deps.rs/repo/github/happy-proto/fpc)
 
 [English](README.md)
 
-快速找到文件或目录，用一条简短的命令复制绝对路径。
+在终端里找到文件，复制它的路径。
 
-给 Agent 指定文件时，工作区之外或被 `.gitignore` 忽略的路径往往不容易选择。`fpc` 通过内置模糊选择器让这些文件也能方便地找到，支持本地、SSH 和 tmux。
+给 AI 助手或同事指出一个文件时，运行 `fpc`，输入几个字符，按下回车，它的绝对路径就到了剪贴板里。
+
+```sh
+fpc                  # 在当前目录及其子目录中选择文件或目录
+fpc src/main.rs      # 已经知道路径时，直接复制
+```
+
+默认包含隐藏文件和被 Git 忽略的路径，`.env` 和构建产物也能找到。本地终端、SSH 和 tmux 中都可以使用同一个命令。
 
 ## 安装
 
@@ -18,19 +24,14 @@
 cargo binstall fpc
 ```
 
-## 使用方式
+## Shell 补全
+
+为 Bash、Fish 或 Zsh 启用 Tab 补全：
 
 ```sh
-fpc                          # 模糊选择当前目录及其子目录中的文件或目录
-fpc ./src/main.rs            # 直接复制路径
-fpc --respect-ignore        # 选择遵循 .gitignore 和 .ignore 规则
-fpc --print ./src/main.rs    # 输出路径，不操作剪贴板
-fpc --install-completion     # 自动检测 shell 并安装补全
-fpc --help                   # 查看所有选项
+fpc --install-completion
 ```
 
-默认包含隐藏项和被忽略的路径。
+更多选项见 `fpc --help`，包括将路径输出到终端而不复制到剪贴板。
 
-选择器会高亮命中查询的字符，包括分散在路径中的非连续匹配，并滚动长路径以展示命中区域。输入 `'dcjanus`（只在开头加一个单引号）要求包含连续子串 `dcjanus`；直接输入 `dcjanus` 使用模糊匹配。
-
-贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)，发布流程见 [RELEASE.md](RELEASE.md)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+[参与贡献](CONTRIBUTING.md) · [变更记录](CHANGELOG.md) · [MIT 许可证](LICENSE)

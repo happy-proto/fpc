@@ -2,13 +2,19 @@
 
 [![CI](https://github.com/happy-proto/fpc/actions/workflows/ci.yml/badge.svg)](https://github.com/happy-proto/fpc/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/fpc.svg)](https://crates.io/crates/fpc)
-[![Dependencies](https://deps.rs/repo/github/happy-proto/fpc/status.svg)](https://deps.rs/repo/github/happy-proto/fpc)
 
 [简体中文](README.zh-CN.md)
 
-Find a file or directory and copy its absolute path, with a short command.
+Copy a file path without leaving the terminal.
 
-When pointing an Agent at a file, paths outside the workspace or hidden by `.gitignore` can be awkward to select. `fpc` makes them easy to find with a built-in fuzzy picker, locally or over SSH and tmux.
+When you need to point an AI assistant or a teammate at a file, run `fpc`, type a few characters, and press Enter. Its absolute path goes straight to your clipboard.
+
+```sh
+fpc                  # Find a file or directory beneath the current directory
+fpc src/main.rs      # Copy a known path directly
+```
+
+Hidden files and Git-ignored paths are included, so `.env` and build outputs are easy to find. The same command works locally, over SSH, and in tmux.
 
 ## Install
 
@@ -18,19 +24,14 @@ Install the latest stable release with [cargo-binstall](https://github.com/cargo
 cargo binstall fpc
 ```
 
-## Usage
+## Shell completion
+
+Enable Tab completion for Bash, Fish, or Zsh:
 
 ```sh
-fpc                          # Fuzzy-pick a file or directory below the current directory
-fpc ./src/main.rs            # Copy a path directly
-fpc --respect-ignore        # Opt in to .gitignore and .ignore rules
-fpc --print ./src/main.rs    # Print the path instead of copying
-fpc --install-completion     # Auto-detect your shell and install completion
-fpc --help                   # Explore all options
+fpc --install-completion
 ```
 
-Hidden files and ignored paths are included by default.
+Run `fpc --help` for more options, including printing paths instead of copying them.
 
-The picker highlights the characters that matched your query, even when they are spread across the path, and scrolls long results to reveal the matching region. Type `'dcjanus` (a single leading quote) to require the continuous substring `dcjanus`; plain `dcjanus` uses fuzzy matching.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions, [RELEASE.md](RELEASE.md) for the release procedure, and [CHANGELOG.md](CHANGELOG.md) for changes.
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
