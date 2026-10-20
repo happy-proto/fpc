@@ -91,8 +91,8 @@ class Terminal:
 
     def close(self):
         os.kill(self.pid, signal.SIGKILL)
-        os.waitpid(self.pid, 0)
         os.close(self.fd)
+        os.waitpid(self.pid, 0)
 
 
 def framework():
@@ -120,7 +120,16 @@ def verify(shell, executable, binary, completion_framework):
         home = Path(temporary).resolve()
         work = home / "work"
         work.mkdir()
-        for name in ["sample.txt", "space name.txt", ".env", "--report"]:
+        for name in [
+            "sample.txt",
+            "space name.txt",
+            ".env",
+            "--report",
+            "README.md",
+            "README.zh-CN.md",
+            "old-readme.txt",
+            ".readme-secret",
+        ]:
             (work / name).touch()
         (work / "folder").mkdir()
         (work / "folder/nested.txt").touch()
@@ -209,6 +218,28 @@ def verify(shell, executable, binary, completion_framework):
                 assert option not in menu, (shell, menu)
             hidden = menu_for(".")
             assert ".env" in hidden, (shell, hidden)
+            readme = menu_for("readme")
+            assert "README.md" in readme and "README.zh-CN.md" in readme, (
+                shell,
+                readme,
+            )
+            assert "old-readme.txt" not in readme and ".readme-secret" not in readme, (
+                shell,
+                readme,
+            )
+            substring = menu_for("zh")
+            assert "README.zh-CN.md" in substring, (shell, substring)
+            nonconsecutive = menu_for("rdm")
+            assert "README" not in nonconsecutive, (shell, nonconsecutive)
+            nested = menu_for("folder/nes")
+            assert "nested.txt" in nested, (shell, nested)
+            directory = menu_for("FOL")
+            assert "folder/" in directory, (shell, directory)
+            rules_readme = menu_for("--ignore-file readme")
+            assert "README.md" in rules_readme and "README.zh-CN.md" in rules_readme, (
+                shell,
+                rules_readme,
+            )
             option = menu_for("--re")
             assert "--respect-ignore" in option, (shell, option)
             shells = menu_for("--install-completion ")
@@ -258,6 +289,8 @@ def verify(shell, executable, binary, completion_framework):
                 ("sam", work / "sample.txt"),
                 ("folder/nes", work / "folder/nested.txt"),
                 ("sp", work / "space name.txt"),
+                ("NAME", work / "space name.txt"),
+                ("zh", work / "README.zh-CN.md"),
                 (".e", work / ".env"),
                 ("-- --r", work / "--report"),
                 (f"{work}/sam", work / "sample.txt"),

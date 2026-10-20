@@ -121,6 +121,77 @@ fn tab_completion_only_offers_paths_without_a_current_directory_entry() {
 }
 
 #[test]
+fn tab_completion_prefers_case_insensitive_prefixes_then_contiguous_substrings() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    for name in [
+        "README.md",
+        "README.zh-CN.md",
+        "old-readme.txt",
+        ".readme-secret",
+    ] {
+        fs::write(root.join(name), "").unwrap();
+    }
+    fs::create_dir(root.join("docs")).unwrap();
+    fs::write(root.join("docs/README.md"), "").unwrap();
+    fs::create_dir(root.join("hidden-only")).unwrap();
+    fs::write(root.join("hidden-only/.env"), "").unwrap();
+    for shell in ["fish", "bash", "zsh"] {
+        for option in [false, true] {
+            for (query, expected, excluded) in [
+                (
+                    "readme",
+                    vec!["README.md", "README.zh-CN.md"],
+                    vec!["old-readme", ".readme-secret", "docs/"],
+                ),
+                ("zh", vec!["README.zh-CN.md"], vec!["README.md"]),
+                ("rdm", vec![], vec!["README", "readme"]),
+                ("readmemd", vec![], vec!["README", "readme"]),
+                ("docs/readme", vec!["docs/README.md"], vec![]),
+                ("./readme", vec!["./README.md"], vec!["old-readme"]),
+                ("DOC", vec!["docs/"], vec!["README"]),
+                ("docs/zh", vec![], vec!["README"]),
+                ("secret", vec![], vec![".readme-secret"]),
+                ("hidden-only/", vec![], vec![".env"]),
+                ("hidden-only/.e", vec!["hidden-only/.env"], vec![]),
+                (".readme", vec![".readme-secret"], vec!["README"]),
+            ] {
+                let mut command = cli(root);
+                command
+                    .env("COMPLETE", shell)
+                    .env("_CLAP_COMPLETE_INDEX", if option { "2" } else { "1" })
+                    .env("_CLAP_IFS", "\n")
+                    .args(["--", "fpc"]);
+                if option {
+                    command.arg("--ignore-file");
+                }
+                let output = command.arg(query).output().unwrap();
+                assert!(output.status.success(), "{shell}: {output:?}");
+                let results = String::from_utf8(output.stdout).unwrap();
+                if expected.is_empty() {
+                    assert!(
+                        results.is_empty(),
+                        "{shell}, {option}, {query}: {results:?}"
+                    );
+                }
+                for value in expected {
+                    assert!(
+                        results.contains(value),
+                        "{shell}, {option}, {query}: {results:?}"
+                    );
+                }
+                for value in excluded {
+                    assert!(
+                        !results.contains(value),
+                        "{shell}, {option}, {query}: {results:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn completion_registration_never_runs_copy_or_picker() {
     let temp = tempfile::tempdir().unwrap();
     for shell in ["fish", "bash", "zsh"] {

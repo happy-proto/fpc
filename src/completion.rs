@@ -67,7 +67,21 @@ impl EnvCompleter for ContextualCompleter {
         completer: &str,
         buf: &mut dyn io::Write,
     ) -> io::Result<()> {
-        self.0.write_registration(var, name, bin, completer, buf)
+        if self.name() == "zsh" {
+            let mut registration = Vec::new();
+            self.0
+                .write_registration(var, name, bin, completer, &mut registration)?;
+            // Candidates are already matched by fpc. Zsh must not apply prefix matching again.
+            let script = String::from_utf8(registration).map_err(io::Error::other)?;
+            buf.write_all(
+                script
+                    .replace("'values' dirs", "'values' dirs -U")
+                    .replace("'values' other", "'values' other -U")
+                    .as_bytes(),
+            )
+        } else {
+            self.0.write_registration(var, name, bin, completer, buf)
+        }
     }
 
     fn write_complete(
@@ -145,6 +159,42 @@ fn path_candidates(current: &OsStr) -> Vec<CompletionCandidate> {
 }
 
 fn complete_path(current: &OsStr, completer: PathCompleter) -> Vec<CompletionCandidate> {
+    let path = Path::new(current);
+    let trailing_separator = current
+        .as_encoded_bytes()
+        .last()
+        .is_some_and(|byte| std::path::is_separator(*byte as char));
+    if !trailing_separator && let Some(name) = path.file_name().and_then(OsStr::to_str) {
+        // Enumerate only the directory being completed; match its final component ourselves.
+        let parent = path.parent().unwrap_or_else(|| Path::new(""));
+        let mut directory = parent.to_path_buf();
+        directory.push("");
+        let query = name.to_lowercase();
+        let mut prefixes = Vec::new();
+        let mut substrings = Vec::new();
+        for candidate in completer.complete(directory.as_os_str()) {
+            let Some(name) = Path::new(candidate.get_value())
+                .file_name()
+                .and_then(OsStr::to_str)
+            else {
+                continue;
+            };
+            if name.starts_with('.') && !query.starts_with('.') {
+                continue;
+            }
+            let name = name.to_lowercase();
+            if name.starts_with(&query) {
+                prefixes.push(candidate);
+            } else if name.contains(&query) {
+                substrings.push(candidate);
+            }
+        }
+        return if prefixes.is_empty() {
+            substrings
+        } else {
+            prefixes
+        };
+    }
     let explicit_dot = current == OsStr::new(".");
     completer
         .complete(if explicit_dot {
@@ -154,6 +204,13 @@ fn complete_path(current: &OsStr, completer: PathCompleter) -> Vec<CompletionCan
         })
         .into_iter()
         .filter(|candidate| candidate.get_value() != OsStr::new("."))
+        .filter(|candidate| {
+            !candidate.is_hide_set()
+                || explicit_dot
+                || path
+                    .file_name()
+                    .is_some_and(|name| name.to_string_lossy().starts_with('.'))
+        })
         .filter(|candidate| {
             !explicit_dot || candidate.get_value().to_string_lossy().starts_with('.')
         })

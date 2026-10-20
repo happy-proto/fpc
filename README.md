@@ -2,13 +2,14 @@
 
 [![CI](https://github.com/happy-proto/fpc/actions/workflows/ci.yml/badge.svg)](https://github.com/happy-proto/fpc/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/fpc.svg)](https://crates.io/crates/fpc)
-[![Dependencies](https://deps.rs/repo/github/happy-proto/fpc/status.svg)](https://deps.rs/repo/github/happy-proto/fpc)
 
 [简体中文](README.zh-CN.md)
 
-Find a file or directory and copy its absolute path, with a short command.
+`fpc` finds files and directories and copies their absolute paths to the clipboard.
 
-When pointing an Agent at a file, paths outside the workspace or hidden by `.gitignore` can be awkward to select. `fpc` makes them easy to find with a built-in fuzzy picker, locally or over SSH and tmux.
+During AI coding, you often need to pass an absolute file path to an Agent. Files outside its workspace or hidden by `.gitignore` can be awkward to select in an editor. `fpc` provides a fuzzy picker in the terminal, or you can pass a path directly.
+
+When run over SSH, `fpc` copies the remote file's absolute path to your local clipboard. It also works inside tmux.
 
 ## Install
 
@@ -21,16 +22,12 @@ cargo binstall fpc
 ## Usage
 
 ```sh
-fpc                          # Fuzzy-pick a file or directory below the current directory
-fpc ./src/main.rs            # Copy a path directly
-fpc --respect-ignore        # Opt in to .gitignore and .ignore rules
-fpc --print ./src/main.rs    # Print the path instead of copying
-fpc --install-completion     # Auto-detect your shell and install completion
-fpc --help                   # Explore all options
+fpc                    # Find a file or directory and copy its absolute path
+fpc ./src/main.rs      # Copy the specified file's absolute path
 ```
 
-Hidden files and ignored paths are included by default.
+The picker searches beneath the current directory, including hidden and Git-ignored paths.
 
-The picker highlights the characters that matched your query, even when they are spread across the path, and scrolls long results to reveal the matching region. Type `'dcjanus` (a single leading quote) to require the continuous substring `dcjanus`; plain `dcjanus` uses fuzzy matching.
+Use `fpc --install-completion` to enable Tab completion for Bash, Fish, or Zsh. Run `fpc --help` for all options.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions, [RELEASE.md](RELEASE.md) for the release procedure, and [CHANGELOG.md](CHANGELOG.md) for changes.
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [MIT License](LICENSE)
