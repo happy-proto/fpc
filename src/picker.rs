@@ -259,7 +259,6 @@ impl Drop for Screen {
 }
 
 pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
-    let mut screen = Screen::open()?;
     let (send, receive) = mpsc::sync_channel(1024);
     let root = root.to_owned();
     thread::spawn(move || {
@@ -276,9 +275,28 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
             }
         }
     });
+    select(receive, "", false)
+}
+
+pub fn complete(candidates: Vec<Candidate>, query: &str) -> Result<Option<PathBuf>> {
+    let (send, receive) = mpsc::channel();
+    for candidate in candidates {
+        send.send(Ok(candidate))?;
+    }
+    drop(send);
+    select(receive, query, true)
+}
+
+fn select(
+    receive: mpsc::Receiver<std::result::Result<Candidate, String>>,
+    initial_query: &str,
+    completing: bool,
+) -> Result<Option<PathBuf>> {
+    let action = if completing { "insert" } else { "copy" };
+    let mut screen = Screen::open()?;
     let mut candidates = Vec::new();
     let mut matches = Vec::new();
-    let mut query = Input::default();
+    let mut query = Input::new(initial_query.to_owned());
     let mut selected = 0usize;
     let mut list_state = ListState::default();
     let mut scanning = true;
@@ -315,6 +333,9 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                 None
             };
             matches = paths::rank(&candidates, query.value());
+            if completing && !query.value().starts_with('.') {
+                matches.retain(|&index| !candidates[index].search().starts_with('.'));
+            }
             selected = previous
                 .and_then(|index| matches.iter().position(|candidate| *candidate == index))
                 .unwrap_or(0);
@@ -337,7 +358,7 @@ pub fn pick(walker: ignore::Walk, root: &Path) -> Result<Option<PathBuf>> {
                 .split(frame.area());
                 frame.render_widget(
                     Paragraph::new(format!(
-                        "fpc  {} / {}{}   Enter copy · ↑↓ select · Esc cancel",
+                        "fpc  {} / {}{}   Enter {action} · ↑↓ select · Esc cancel",
                         matches.len(),
                         candidates.len(),
                         if scanning { " (scanning)" } else { "" }

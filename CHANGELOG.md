@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Complete path names by case-insensitive prefix, falling back to contiguous substring matches only when no prefixes match. Tab completion stays within the current directory level and only offers hidden names when the name being completed starts with `.`.
+- Open an interactive fuzzy picker for path Tab completion in Bash, Fish, and Zsh, seeded with the current file name. Enter inserts the selection without executing the command or copying; Esc and Ctrl+C preserve the original input. Search one directory level at a time and show hidden names only for queries beginning with `.`. Options and shell names retain ordinary completion.
 
 ### Added
 

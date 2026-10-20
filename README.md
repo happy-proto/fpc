@@ -31,7 +31,9 @@ fpc --help                   # Explore all options
 
 Hidden files and ignored paths are included by default.
 
-Tab completion matches file and directory names by case-insensitive prefix, falling back to case-insensitive contiguous substrings only when there are no prefix matches. For example, `readme<Tab>` matches `README.md`, and `zh<Tab>` can match `README.zh-CN.md`. It completes one directory level at a time and requires a leading `.` to offer hidden names. Nonconsecutive matching is reserved for the picker.
+Tab on a path opens the fuzzy picker with the current name as its query. For example, `readmemd<Tab>` and `rdm<Tab>` can find `README.md`. Edit the query or use the arrow keys to select, then press Enter to insert the path; this does not execute the command or copy anything. Even a single match needs confirmation. Esc or Ctrl+C cancels without changing the command line. Completion searches one directory level at a time, retains a selected directory's trailing `/`, and requires a leading `.` in the query to show hidden names. Options and shell names still use ordinary shell completion.
+
+After upgrading, run `fpc --install-completion` and open a new shell. Fish also installs a managed `conf.d/fpc.fish` snippet so its Tab binding is ready before the first completion; other commands retain their previous Tab binding.
 
 The picker highlights the characters that matched your query, even when they are spread across the path, and scrolls long results to reveal the matching region. Type `'dcjanus` (a single leading quote) to require the continuous substring `dcjanus`; plain `dcjanus` uses fuzzy matching.
 
