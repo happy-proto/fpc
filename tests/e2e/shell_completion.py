@@ -3,6 +3,7 @@
 # /// script
 # requires-python = ">=3.15"
 # dependencies = [
+#     "pyte>=0.8.2",
 #     "typer>=0.27.3",
 # ]
 # ///
@@ -26,6 +27,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
+import pyte
 import typer
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
@@ -52,6 +54,9 @@ class Terminal:
             os.chdir(directory)
             os.execve(command[0], command, environment)
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+        self.screen = pyte.Screen(120, 40)
+        self.screen.write_process_input = self.send
+        self.stream = pyte.ByteStream(self.screen)
         try:
             self.wait_for(PROMPT)
             self.check_alt_screen = True
@@ -63,12 +68,9 @@ class Terminal:
         if not select.select([self.fd], [], [], timeout)[0]:
             return ""
         try:
-            output = os.read(self.fd, 65536).decode(errors="replace")
-            # Fish probes terminal capabilities before showing its first prompt.
-            if "\x1b[0c" in output:
-                self.send("\x1b[?1;2c")
-            if "\x1b[6n" in output:
-                self.send("\x1b[1;1R")
+            data = os.read(self.fd, 65536)
+            self.stream.feed(data)
+            output = data.decode(errors="replace")
             assert not self.check_alt_screen or "\x1b[?1049h" not in output, (
                 "Tab completion entered the alternate screen"
             )
@@ -78,31 +80,56 @@ class Terminal:
                 raise AssertionError("Shell exited unexpectedly") from error
             raise
 
-    def wait_for(self, expected, timeout=8):
+    def wait_for(self, expected, timeout=8, *, line=False):
         output = ""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             output += self.read(0.1)
             clean = ANSI.sub("", output).replace("\r", "")
-            if expected in clean:
+            if (
+                expected.rstrip("\n") in clean.splitlines()
+                if line
+                else expected in clean
+            ):
                 return clean
         raise AssertionError(f"Timed out waiting for {expected!r}: {output!r}")
 
     def send(self, text):
         os.write(self.fd, text.encode())
 
+    def wait_screen(self, predicate, timeout=8):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self.read(0.05)
+            if predicate(self.screen.display):
+                return
+        raise AssertionError(self.screen.display)
+
+    def resize(self, columns, rows):
+        self.screen.resize(lines=rows, columns=columns)
+        fcntl.ioctl(
+            self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0)
+        )
+
+    def clear_line(self):
+        self.send("\x15printf 'FPC_MENU_DONE\\n'\r")
+        cleared = self.wait_for("FPC_MENU_DONE\n", line=True)
+        if PROMPT not in cleared.rsplit("FPC_MENU_DONE\n", 1)[1]:
+            self.wait_for(PROMPT)
+
     def menu(self, prefix):
-        self.send(f"fpc {prefix}\t\t")
+        self.send(f"fpc {prefix}" + ("\t" if self.shell == "fish" else "\t\t"))
         output = ""
         deadline = time.monotonic() + 0.8
         while time.monotonic() < deadline:
             output += self.read(0.05)
         if self.shell == "fish":
             # Fish can cancel its pager without reprinting the unchanged prompt.
-            self.send("\x03\x15printf 'FPC_MENU_DONE\\n'\r")
-            cleared = self.wait_for("FPC_MENU_DONE\n")
-            if PROMPT not in cleared.split("FPC_MENU_DONE\n", 1)[1]:
-                self.wait_for(PROMPT)
+            self.send("\x03")
+            self.wait_screen(
+                lambda rows: not any("Enter insert" in row for row in rows)
+            )
+            self.clear_line()
         else:
             self.send("\x03")
             self.wait_for(PROMPT)
@@ -133,6 +160,66 @@ def framework():
     )
 
 
+def verify_fish_inline_menu(terminal):
+    terminal.send("printf 'FPC_CONTEXT_MARKER\\n'\r")
+    terminal.wait_for("FPC_CONTEXT_MARKER\n", line=True)
+    terminal.send("fpc readmemd\t")
+    terminal.wait_screen(lambda rows: any("Enter insert" in row for row in rows))
+    rows = terminal.screen.display
+    assert any("FPC_CONTEXT_MARKER" in row for row in rows), rows
+    assert any("FPC_READY> fpc readmemd" in row for row in rows), rows
+    assert any("README.md" in row for row in rows), rows
+    terminal.send("\x1b")
+    terminal.wait_screen(
+        lambda rows: (
+            not any("Enter insert" in row for row in rows)
+            and any("FPC_READY> fpc readmemd" in row for row in rows)
+        )
+    )
+    terminal.clear_line()
+
+    terminal.send("fpc rdm\t")
+    terminal.wait_screen(lambda rows: any("1 / 3" in row for row in rows))
+    for name in ["README.md", "README.zh-CN.md", "old-readme.txt"]:
+        assert any(name in row for row in terminal.screen.display), name
+    terminal.send("\x03")
+    terminal.wait_screen(
+        lambda rows: (
+            not any("Enter insert" in row for row in rows)
+            and any("FPC_READY> fpc rdm" in row for row in rows)
+        )
+    )
+    terminal.clear_line()
+
+    suffix = " --print"
+    terminal.send("fpc readmemd" + suffix + "\x1b[D" * len(suffix) + "\t")
+    terminal.wait_screen(lambda rows: any("Enter insert" in row for row in rows))
+    terminal.send("\x1b")
+    terminal.wait_screen(lambda rows: not any("Enter insert" in row for row in rows))
+    terminal.send("x")
+    terminal.wait_screen(
+        lambda rows: any("fpc readmemdx --print" in row for row in rows)
+    )
+    terminal.clear_line()
+
+    terminal.resize(64, 8)
+    terminal.send("printf 'FPC_SMALL_CONTEXT\\n'\r")
+    terminal.wait_for("FPC_SMALL_CONTEXT\n", line=True)
+    terminal.send("fpc \t")
+    terminal.wait_screen(lambda rows: any("Enter insert" in row for row in rows))
+    rows = terminal.screen.display
+    assert any("FPC_SMALL_CONTEXT" in row for row in rows), rows
+    assert (
+        sum(bool(row.strip()) and row.startswith(("  ", "› ")) for row in rows) == 5
+    ), rows
+    terminal.send("\x1b[B" * 6)
+    terminal.wait_screen(lambda rows: any("7 /" in row for row in rows))
+    terminal.resize(80, 12)
+    terminal.wait_screen(lambda rows: not any("Enter insert" in row for row in rows))
+    terminal.clear_line()
+    terminal.resize(120, 40)
+
+
 def verify(shell, executable, binary, completion_framework):
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix=f"fpc-{shell}-e2e-") as temporary:
@@ -150,6 +237,9 @@ def verify(shell, executable, binary, completion_framework):
             ".readme-secret",
         ]:
             (work / name).touch()
+        if shell == "fish":
+            (work / "line\nbreak.txt").touch()
+            (work / ("界" * 40 + ".txt")).touch()
         (work / "folder").mkdir()
         (work / "folder/nested.txt").touch()
         (home / "bin").mkdir()
@@ -210,7 +300,11 @@ def verify(shell, executable, binary, completion_framework):
                 return terminal.menu(prefix)
 
             menu = menu_for("")
-            assert "sample.txt" in menu and "folder" in menu, (shell, menu)
+            assert ("README.md" if shell == "fish" else "sample.txt") in menu, (
+                shell,
+                menu,
+            )
+            assert "folder" in menu, (shell, menu)
             assert not re.search(r"(?:^|\s)\.(?:\s|$)", menu), (shell, menu)
             for option in [
                 "--help",
@@ -255,7 +349,10 @@ def verify(shell, executable, binary, completion_framework):
                 shells,
             )
             rules = menu_for("--ignore-file ")
-            assert "sample.txt" in rules and "folder" in rules, (shell, rules)
+            if shell == "fish":
+                assert "README.md" in rules, (shell, rules)
+            else:
+                assert "sample.txt" in rules and "folder" in rules, (shell, rules)
             assert "--help" not in rules, (shell, rules)
             escaped = menu_for("-- --r")
             assert "--report" in escaped and "--respect-ignore" not in escaped, (
@@ -280,12 +377,13 @@ def verify(shell, executable, binary, completion_framework):
             for command in [
                 "fpc --print --re\t ./sample.txt\r",
                 "fpc --print --ignore-file sam\t ./sample.txt\r",
+                "fpc --print --ignore-file=sam\t ./sample.txt\r",
             ]:
                 terminal.send(command)
                 expected = str(work / "sample.txt")
-                output = terminal.wait_for(expected + "\n")
+                output = terminal.wait_for(expected + "\n", line=True)
                 assert expected in output.splitlines(), (shell, command, output)
-                if PROMPT not in output.split(expected + "\n", 1)[1]:
+                if PROMPT not in output.rsplit(expected + "\n", 1)[1]:
                     terminal.wait_for(PROMPT)
             for typed, expected in [
                 ("sam", work / "sample.txt"),
@@ -300,18 +398,30 @@ def verify(shell, executable, binary, completion_framework):
                 ("../work/sam", work / "../work/sample.txt"),
             ]:
                 terminal.send(f"fpc --print {typed}\t\r")
-                output = terminal.wait_for(str(expected) + "\n")
+                output = terminal.wait_for(str(expected) + "\n", line=True)
                 assert str(expected) in output.splitlines(), (shell, typed, output)
-                if PROMPT not in output.split(str(expected) + "\n", 1)[1]:
+                if PROMPT not in output.rsplit(str(expected) + "\n", 1)[1]:
                     terminal.wait_for(PROMPT)
             if shell == "fish":
-                terminal.send("fpc --print readmemd\t\t\r\r")
+                terminal.send("fpc --print readmemd\t")
+                terminal.wait_screen(
+                    lambda rows: any("Enter insert" in row for row in rows)
+                )
+                terminal.send("\r")
+                terminal.wait_screen(
+                    lambda rows: not any("Enter insert" in row for row in rows)
+                )
+                terminal.send("\r")
                 expected = str(work / "README.md")
-                output = terminal.wait_for(expected + "\n")
+                output = terminal.wait_for(expected + "\n", line=True)
                 assert expected in output.splitlines(), (shell, output)
-                if PROMPT not in output.split(expected + "\n", 1)[1]:
+                if PROMPT not in output.rsplit(expected + "\n", 1)[1]:
                     terminal.wait_for(PROMPT)
                 for command, expected in [
+                    (
+                        "fpc --print lineb\t >/dev/null; and printf 'FPC_NEWLINE_OK\\n'\r",
+                        "FPC_NEWLINE_OK\n",
+                    ),
                     ("printf 'FPC_NON_FPC=%s\\n' sam\t\r", "FPC_NON_FPC=sample.txt\n"),
                     (
                         "printf 'FPC_ORIGINAL_TAB=%s\\n' $fpc_test_tab_used\r",
@@ -322,6 +432,7 @@ def verify(shell, executable, binary, completion_framework):
                     output = terminal.wait_for(expected)
                     if PROMPT not in output.split(expected, 1)[1]:
                         terminal.wait_for(PROMPT)
+                verify_fish_inline_menu(terminal)
         finally:
             terminal.close()
     print(

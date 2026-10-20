@@ -18,7 +18,7 @@ use std::{
     fs, io,
     path::{Path, PathBuf},
     process::Command,
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -30,6 +30,65 @@ pub enum Shell {
 
 const START: &str = "# >>> fpc completion >>>";
 const END: &str = "# <<< fpc completion <<<";
+
+pub fn interact() -> Result<()> {
+    use io::Write;
+
+    let args: Vec<_> = env::args_os().skip(2).collect();
+    let index = args
+        .len()
+        .checked_sub(1)
+        .context("Missing completion arguments")?;
+    let current = &args[index];
+    let completing_option = current.as_encoded_bytes().starts_with(b"--");
+    let inline_value = current.as_encoded_bytes().starts_with(b"--ignore-file=");
+    let request = Arc::new(Mutex::new(None));
+    let mut cmd = command();
+    for (id, files_only) in [("path", false), ("ignore_file", true)] {
+        let request = Arc::clone(&request);
+        cmd = cmd.mut_arg(id, |arg| {
+            arg.add(ArgValueCompleter::new(move |value: &OsStr| {
+                *request.lock().unwrap() = Some((value.to_owned(), files_only));
+                Vec::<CompletionCandidate>::new()
+            }))
+        });
+    }
+    let cwd = env::current_dir()?;
+    let candidates = clap_complete::engine::complete(&mut cmd, args, index, Some(&cwd))?;
+    let request = request.lock().unwrap().take();
+    let mut out = io::stdout().lock();
+    let Some((current, files_only)) =
+        request.filter(|_| !completing_option || candidates.is_empty())
+    else {
+        out.write_all(b"fallback\0")?;
+        return Ok(());
+    };
+    let candidates = if files_only {
+        file_candidates(&current)
+    } else {
+        path_candidates(&current)
+    };
+    let Some(selected) = crate::completion_menu::select(&candidates)? else {
+        out.write_all(b"cancelled\0")?;
+        return Ok(());
+    };
+    let path = Path::new(&selected);
+    let selected = if let Ok(suffix) = path.strip_prefix("~") {
+        env::home_dir()
+            .context("Cannot read home directory")?
+            .join(suffix)
+            .into_os_string()
+    } else {
+        selected
+    };
+    out.write_all(b"selected\0")?;
+    if inline_value {
+        out.write_all(b"--ignore-file=")?;
+    }
+    out.write_all(selected.as_encoded_bytes())?;
+    out.write_all(b"\0")?;
+    Ok(())
+}
 
 pub fn command() -> clap::Command {
     crate::Cli::command()

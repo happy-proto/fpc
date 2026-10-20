@@ -13,29 +13,23 @@ function _fpc_previous_tab
     end
 end
 
-function _fpc_native_tab
+function _fpc_inline_tab
     set -l words (commandline --current-process --tokens-expanded --cut-at-cursor)
     set -l current (commandline --current-token --tokens-expanded | string collect)
-    if test "$words[1]" = fpc; and test -n "$current"; and not commandline --paging-mode
-        set -l candidates (COMPLETE=fish command fpc -- $words "$current")
-        if set -q candidates[1]
-            set -l first (string split --max 1 \t -- "$candidates[1]")[1]
-            # Fish's subsequence filter is case-sensitive. Use the top candidate's
-            # casing for the same query, then let the existing Tab binding complete it.
-            set -l pattern ''
-            for character in (string split '' -- "$current")
-                set pattern "$pattern(?>.*?("(string escape --style=regex -- "$character")"))"
-            end
-            set -l matched (string match --ignore-case --regex --groups-only -- "$pattern" "$first")
-            if test (count $matched) -eq (string length -- "$current")
-                set -l canonical (string join '' -- $matched)
-                if test "$canonical" != "$current"
-                    commandline --current-token --replace -- (string escape -- "$canonical")
-                end
-            end
-        end
+    if test "$words[1]" != fpc; or commandline --paging-mode
+        _fpc_previous_tab
+        return
     end
-    _fpc_previous_tab
+    set -l result (_FPC_COMPLETE=1 command fpc -- $words "$current" | string split0)
+    switch "$result[1]"
+        case fallback
+            _fpc_previous_tab
+        case selected
+            commandline --current-token --replace -- (string escape -- "$result[2]")
+            commandline -f repaint
+        case '*'
+            commandline -f repaint
+    end
 end
 
 for mode in default insert
@@ -53,11 +47,11 @@ for mode in default insert
     end
     if test -n "$key_index"
         set -l actions $parts[(math $key_index + 1)..-1]
-        if not contains -- _fpc_native_tab $actions
+        if not contains -- _fpc_inline_tab $actions
             set -g _fpc_tab_$mode $actions
         end
     else
         set -g _fpc_tab_$mode complete
     end
-    bind -M $mode \t _fpc_native_tab
+    bind -M $mode \t _fpc_inline_tab
 end
