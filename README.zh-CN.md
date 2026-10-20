@@ -5,16 +5,11 @@
 
 [English](README.md)
 
-在终端里找到文件，复制它的路径。
+`fpc` 用于查找文件或目录，并将其绝对路径复制到剪贴板。
 
-给 AI 助手或同事指出一个文件时，运行 `fpc`，输入几个字符，按下回车，它的绝对路径就到了剪贴板里。
+做 AI coding 时，常常需要把文件的绝对路径传给 Agent，尤其是工作区之外或被 `.gitignore` 忽略、不方便从编辑器中选择的文件。`fpc` 提供一个终端内的模糊选择器，也可以直接复制指定路径。
 
-```sh
-fpc                  # 在当前目录及其子目录中选择文件或目录
-fpc src/main.rs      # 已经知道路径时，直接复制
-```
-
-默认包含隐藏文件和被 Git 忽略的路径，`.env` 和构建产物也能找到。本地终端、SSH 和 tmux 中都可以使用同一个命令。
+在 SSH 会话中运行时，可以把远端文件的绝对路径复制到本地剪贴板，也支持在 tmux 中使用。
 
 ## 安装
 
@@ -24,14 +19,15 @@ fpc src/main.rs      # 已经知道路径时，直接复制
 cargo binstall fpc
 ```
 
-## Shell 补全
-
-为 Bash、Fish 或 Zsh 启用 Tab 补全：
+## 使用方式
 
 ```sh
-fpc --install-completion
+fpc                    # 查找并复制文件或目录的路径
+fpc ./src/main.rs      # 复制指定文件的绝对路径
 ```
 
-更多选项见 `fpc --help`，包括将路径输出到终端而不复制到剪贴板。
+选择器搜索当前目录及其子目录，默认包含隐藏项和被 Git 忽略的路径。
+
+运行 `fpc --install-completion` 可启用 Bash、Fish 或 Zsh 的 Tab 补全，全部选项见 `fpc --help`。
 
 [参与贡献](CONTRIBUTING.md) · [变更记录](CHANGELOG.md) · [MIT 许可证](LICENSE)
