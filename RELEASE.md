@@ -23,4 +23,3 @@
 If a step fails, inspect the existing release, draft, tag, artifacts, and registry before retrying only missing steps. Never move a published stable tag, replace its assets, or reuse a crate version; publish corrections as a new version.
 
 If the GitHub release exists but **Publish to crates.io** failed, rerun only the failed job after resolving the failure. Do not rerun the successful GitHub release job. If Cargo timed out after uploading, check crates.io before retrying; the upload may have succeeded.
-
