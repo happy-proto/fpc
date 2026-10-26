@@ -19,14 +19,14 @@ workflows:
         - 'mozilla-actions/sccache-action@v0.0.11'
     '.github/workflows/publish.yml':
         - 'actions/download-artifact@v8'
-    '.github/workflows/release.yml':
+    '.github/workflows/release-build.yml':
         - 'actions/cache@v5'
         - 'actions/checkout@v7'
         - 'actions/upload-artifact@v7'
         - 'dtolnay/rust-toolchain@stable'
         - 'jdx/mise-action@v5'
         - 'mozilla-actions/sccache-action@v0.0.11'
-    '.github/workflows/stable.yml':
+    '.github/workflows/release.yml':
         - 'actions/checkout@v7'
         - 'cargo-bins/cargo-binstall@v1.26.0'
         - 'dtolnay/rust-toolchain@stable'

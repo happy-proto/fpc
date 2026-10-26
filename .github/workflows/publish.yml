@@ -22,7 +22,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   artifacts:
-    uses: ./.github/workflows/release.yml
+    uses: ./.github/workflows/release-build.yml
 
   publish:
     needs: [checks, artifacts]
