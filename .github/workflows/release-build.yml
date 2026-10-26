@@ -2,8 +2,6 @@ name: Release validation
 
 on:
   workflow_call:
-  pull_request:
-  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -15,7 +13,7 @@ defaults:
 
 concurrency:
   group: release-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+  cancel-in-progress: false
 
 jobs:
   prepare:

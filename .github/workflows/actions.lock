@@ -26,6 +26,10 @@ workflows:
         - 'dtolnay/rust-toolchain@stable'
         - 'jdx/mise-action@v5'
         - 'mozilla-actions/sccache-action@v0.0.11'
+    '.github/workflows/release-smoke.yml':
+        - 'actions/checkout@v7'
+        - 'dtolnay/rust-toolchain@stable'
+        - 'jdx/mise-action@v5'
     '.github/workflows/release.yml':
         - 'actions/checkout@v7'
         - 'cargo-bins/cargo-binstall@v1.26.0'

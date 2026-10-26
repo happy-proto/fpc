@@ -26,4 +26,6 @@ If the GitHub release exists but **Publish to crates.io** failed, rerun only the
 
 ## Workflows
 
-The Release validation workflow validates packages and builds release archives for pull requests and merge groups. Publish release runs CI and the same release validation before publishing the rolling nightly on pushes to `main`. Stable release runs on version tags, reuses Publish release to publish GitHub assets, then publishes and verifies the crate. Publishing jobs are only created for their corresponding events, so they do not appear as skipped checks on pull requests or nightly builds.
+Pull requests and merge groups run CI, terminal acceptance, and a package smoke test that checks package metadata and creates the source archive without compiling release binaries. The package smoke test retains the required check name `Release required`.
+
+Publish release runs CI and Release validation, including full builds and archive smoke tests for all release targets, before publishing the rolling nightly on pushes to `main`. Stable release runs on version tags, reuses Publish release to publish GitHub assets, then publishes and verifies the crate. Publishing and full release build jobs are only created for their corresponding events, so they do not appear as skipped checks on pull requests. Crate publishing jobs are also absent from nightly builds.
