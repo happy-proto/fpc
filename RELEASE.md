@@ -24,8 +24,3 @@ If a step fails, inspect the existing release, draft, tag, artifacts, and regist
 
 If the GitHub release exists but **Publish to crates.io** failed, rerun only the failed job after resolving the failure. Do not rerun the successful GitHub release job. If Cargo timed out after uploading, check crates.io before retrying; the upload may have succeeded.
 
-## Workflows
-
-Pull requests and merge groups run CI, terminal acceptance, and a package smoke test that checks package metadata and creates the source archive without compiling release binaries. The package smoke test retains the required check name `Release required`.
-
-Publish release runs CI and Release validation, including full builds and archive smoke tests for all release targets, before publishing the rolling nightly on pushes to `main`. Stable release runs on version tags, reuses Publish release to publish GitHub assets, then publishes and verifies the crate. Publishing and full release build jobs are only created for their corresponding events, so they do not appear as skipped checks on pull requests. Crate publishing jobs are also absent from nightly builds.
