@@ -10,10 +10,6 @@ mise run test
 
 Checks cover formatting, Clippy, workflows, and fast tests without changing your clipboard or requiring shell completion frameworks. Python scripts use uv, which downloads Python 3.15+ and their dependencies automatically.
 
-Pull requests run checks, debug-build tests, shell and clipboard acceptance tests, and a package smoke test. Full release builds run when publishing nightly or stable releases.
-
-CI records compiler cache statistics in the job summary and uploads them with Cargo timings as diagnostic artifacts. Artifact uploads are required; upload failures fail the job.
-
 Use `mise run install` to try your changes locally. `mise run setup` optionally installs Git hooks. CI also tests Bash, Fish, Zsh, and real clipboard behavior on Linux and macOS.
 
 Open a PR from a separate branch with an English Conventional Commit title. Describe the change and test relevant behavior. PRs are squash-merged into `main`.
