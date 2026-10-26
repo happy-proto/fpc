@@ -240,7 +240,7 @@ jobs:
         run: cargo publish --dry-run --locked
       - name: Authenticate with crates.io
         id: auth
-        uses: rust-lang/crates-io-auth-action@v1.0.5
+        uses: rust-lang/crates-io-auth-action@v1.0.6
       - name: Publish the tagged package
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
@@ -263,7 +263,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: cargo-bins/cargo-binstall@v1.25.3
+      - uses: cargo-bins/cargo-binstall@v1.26.0
         with:
           version: '1.25.3'
       - name: Install and verify the published binary
