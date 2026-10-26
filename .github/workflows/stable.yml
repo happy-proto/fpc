@@ -1,0 +1,82 @@
+name: Stable release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: stable-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  github-release:
+    uses: ./.github/workflows/publish.yml
+    permissions:
+      contents: write
+
+  publish-crate:
+    name: Publish to crates.io
+    needs: github-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - name: Validate the tagged package
+        run: cargo publish --dry-run --locked
+      - name: Authenticate with crates.io
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1.0.6
+      - name: Publish the tagged package
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --locked
+
+  verify-published-crate:
+    name: Verify published installation
+    needs: publish-crate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: uv
+          cache: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: cargo-bins/cargo-binstall@v1.26.0
+        with:
+          version: '1.25.3'
+      - name: Install and verify the published binary
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          cargo binstall fpc --version "${TAG#v}" --registry crates-io \
+            --strategies crate-meta-data --no-confirm --install-path "$RUNNER_TEMP/binstall"
+          ./tests/e2e/cli_behavior.py "$RUNNER_TEMP/binstall/fpc"
+      - name: Install and verify the published source package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          cargo install fpc --version "${TAG#v}" --registry crates-io \
+            --locked --root "$RUNNER_TEMP/source"
+          ./tests/e2e/cli_behavior.py "$RUNNER_TEMP/source/bin/fpc"
