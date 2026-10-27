@@ -17,7 +17,7 @@
    git push origin v<version>
    ```
 
-2. Wait for the Release workflow to finish. Review the published GitHub release, assets, and notes.
+2. Wait for the Stable release workflow to finish. Review the published GitHub release, assets, and notes.
 3. Confirm the intended version appears on crates.io.
 
 If a step fails, inspect the existing release, draft, tag, artifacts, and registry before retrying only missing steps. Never move a published stable tag, replace its assets, or reuse a crate version; publish corrections as a new version.

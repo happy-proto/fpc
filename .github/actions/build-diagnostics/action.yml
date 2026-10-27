@@ -26,3 +26,4 @@ runs:
         name: ${{ inputs.name }}
         path: build-diagnostics
         retention-days: 7
+        if-no-files-found: error
