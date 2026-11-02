@@ -32,7 +32,7 @@ workflows:
         - 'jdx/mise-action@v5'
     '.github/workflows/release.yml':
         - 'actions/checkout@v7'
-        - 'cargo-bins/cargo-binstall@v1.26.0'
+        - 'cargo-bins/cargo-binstall@v1.26.1'
         - 'dtolnay/rust-toolchain@stable'
         - 'jdx/mise-action@v5'
         - 'rust-lang/crates-io-auth-action@v1.0.6'
@@ -57,9 +57,9 @@ dependencies:
         commit: 'sha1-cf430e030ddbb5b0abf93d22962f4752f3646cd9'
         owner_id: 44036562
         repo_id: 192625955
-    'cargo-bins/cargo-binstall@v1.26.0':
-        ref: 'v1.26.0'
-        commit: 'sha1-8a2045612414e945291083f820cd50b4d8fc2218'
+    'cargo-bins/cargo-binstall@v1.26.1':
+        ref: 'v1.26.1'
+        commit: 'sha1-81df5c23b0dc775b009efdfc9895c5965b7a4e40'
         owner_id: 110581826
         repo_id: 321270638
     'dtolnay/rust-toolchain@stable':
