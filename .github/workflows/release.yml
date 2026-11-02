@@ -63,7 +63,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-      - uses: cargo-bins/cargo-binstall@v1.26.0
+      - uses: cargo-bins/cargo-binstall@v1.26.1
         with:
           version: '1.25.3'
       - name: Install and verify the published binary
