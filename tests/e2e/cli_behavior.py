@@ -161,8 +161,18 @@ def remote_copy(binary, root):
     target = root / name
     target.touch()
     expected = os.fsencode(target.resolve())
-    for variable in ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"]:
-        env = environment(root) | {variable: "remote-session"}
+    native_log = root / "native-copy"
+    for program in ["pbcopy", "wl-copy", "xclip"]:
+        stub = root / program
+        stub.write_text(f'#!/bin/sh\n/bin/cat > "{native_log}"\n')
+        stub.chmod(0o700)
+    for variable in ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY", "REX_SESSION"]:
+        env = environment(root) | {
+            variable: "remote-session",
+            "PATH": str(root),
+            "DISPLAY": "fixture",
+            "WAYLAND_DISPLAY": "fixture",
+        }
         process = Process(binary, ["--", name], root, env)
         try:
             stdout, stderr = process.finish()
@@ -172,6 +182,7 @@ def remote_copy(binary, root):
             )
         finally:
             process.close()
+        assert not native_log.exists(), variable
         output = subprocess.run(
             [str(binary), "--", name],
             cwd=root,
@@ -183,6 +194,7 @@ def remote_copy(binary, root):
         assert output.stdout == expected + b"\n", output
         assert b"Clipboard unavailable" in output.stderr, output
         assert b"\x1b]52;" not in output.stdout + output.stderr, output
+        assert not native_log.exists(), variable
 
 
 def picker(binary, root, arguments, query, target=None, keys=b"\r"):

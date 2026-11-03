@@ -105,7 +105,13 @@ pub fn copy(bytes: &[u8]) -> Result<()> {
         command_copy("tmux", &["load-buffer", "-w", "-t", client, "-"], bytes)?;
         return Ok(());
     }
-    if present("SSH_CONNECTION") || present("SSH_CLIENT") || present("SSH_TTY") {
+    // Rex sessions can run remotely without SSH environment variables. Let the
+    // attached terminal handle the clipboard instead of the server's desktop.
+    if present("REX_SESSION")
+        || present("SSH_CONNECTION")
+        || present("SSH_CLIENT")
+        || present("SSH_TTY")
+    {
         return osc_copy(bytes);
     }
     let mut failures = Vec::new();
