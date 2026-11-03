@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Use OSC 52 in Rex sessions even without SSH environment variables, so remote sessions copy paths to the attached terminal's clipboard instead of the remote system clipboard.
+
 ## [0.0.3] - 2026-10-20
 
 ### Changed

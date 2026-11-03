@@ -10,7 +10,7 @@
 
 During AI coding, you often need to pass an absolute file path to an Agent. Files outside its workspace or hidden by `.gitignore` can be awkward to select in an editor. `fpc` provides a fuzzy picker in the terminal, or you can pass a path directly.
 
-When run over SSH, `fpc` copies the remote file's absolute path to your local clipboard. It also works inside tmux.
+When run over SSH or in Rex, `fpc` uses OSC 52 to copy paths to the attached terminal's clipboard, including in remote sessions. It also works inside tmux through tmux's clipboard channel. The terminal must support and allow OSC 52 clipboard writes.
 
 ## Install
 
