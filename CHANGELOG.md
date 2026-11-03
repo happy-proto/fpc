@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-11-03
+
 ### Fixed
 
 - Use OSC 52 in Rex sessions even without SSH environment variables, so remote sessions copy paths to the attached terminal's clipboard instead of the remote system clipboard.
@@ -38,7 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dynamic Bash, Fish, and Zsh completion for paths, options, and shell names, with explicit installation into standalone files without editing shell startup files.
 - Detailed `--version` output with source commit, dirty state, and build information, plus a short `-V` form.
 
-[Unreleased]: https://github.com/happy-proto/fpc/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/happy-proto/fpc/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/happy-proto/fpc/releases/tag/v0.0.4
 [0.0.3]: https://github.com/happy-proto/fpc/releases/tag/v0.0.3
 [0.0.2]: https://github.com/happy-proto/fpc/releases/tag/v0.0.2
 [0.0.1]: https://github.com/happy-proto/fpc/releases/tag/v0.0.1
