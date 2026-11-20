@@ -1,6 +1,9 @@
 name: Set up Rust CI
 description: Install the project toolchain and separate download and compiler caches.
 inputs:
+  toolchain:
+    description: Rust toolchain to install.
+    default: stable
   targets:
     description: Additional Rust targets to install.
     default: ''
@@ -10,9 +13,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@v1
       with:
-        toolchain: stable
+        toolchain: ${{ inputs.toolchain }}
         components: rustfmt, clippy
         targets: ${{ inputs.targets }}
     # Only trusted main checks write this download-only cache. Cargo verifies registry checksums.

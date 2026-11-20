@@ -7,14 +7,14 @@ workflows:
         - 'actions/cache@v5'
         - 'actions/checkout@v7'
         - 'actions/upload-artifact@v7'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@v1'
         - 'jdx/mise-action@v5'
         - 'mozilla-actions/sccache-action@v0.0.11'
     '.github/workflows/ci.yml':
         - 'actions/cache@v5'
         - 'actions/checkout@v7'
         - 'actions/upload-artifact@v7'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@v1'
         - 'jdx/mise-action@v5'
         - 'mozilla-actions/sccache-action@v0.0.11'
     '.github/workflows/publish.yml':
@@ -23,17 +23,17 @@ workflows:
         - 'actions/cache@v5'
         - 'actions/checkout@v7'
         - 'actions/upload-artifact@v7'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@v1'
         - 'jdx/mise-action@v5'
         - 'mozilla-actions/sccache-action@v0.0.11'
     '.github/workflows/release-smoke.yml':
         - 'actions/checkout@v7'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@v1'
         - 'jdx/mise-action@v5'
     '.github/workflows/release.yml':
         - 'actions/checkout@v7'
         - 'cargo-bins/cargo-binstall@v1.26.2'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@v1'
         - 'jdx/mise-action@v5'
         - 'rust-lang/crates-io-auth-action@v1.0.6'
 dependencies:
@@ -62,9 +62,9 @@ dependencies:
         commit: 'sha1-851112458b5f28a29e5bc14a690c3f283d9dcc6f'
         owner_id: 110581826
         repo_id: 321270638
-    'dtolnay/rust-toolchain@stable':
-        ref: 'stable'
-        commit: 'sha1-b725eda525362e7cf34af9a7243cac1e3f01a7ec'
+    'dtolnay/rust-toolchain@v1':
+        ref: 'v1'
+        commit: 'sha1-683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         owner_id: 1940490
         repo_id: 260749683
     'jdx/mise-action@v5':
