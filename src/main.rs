@@ -57,6 +57,9 @@ struct Cli {
     /// Print the absolute path instead of copying it
     #[arg(long)]
     print: bool,
+    /// Report clipboard routing and terminal diagnostics without copying
+    #[arg(long, conflicts_with_all = ["path", "respect_ignore", "ignore_file", "print", "install_completion"])]
+    doctor: bool,
     /// Install dynamic completion (fish, bash, or zsh); omit the shell to detect it
     #[arg(long, num_args = 0..=1, value_enum,
         conflicts_with_all = ["path", "respect_ignore", "ignore_file", "print"])]
@@ -66,6 +69,11 @@ struct Cli {
 fn run() -> Result<()> {
     completion::complete();
     let cli = Cli::parse();
+    if cli.doctor {
+        let mut out = io::stdout().lock();
+        writeln!(out, "fpc {LONG_VERSION}\n")?;
+        return Ok(clipboard::doctor(&mut out)?);
+    }
     if let Some(shell) = cli.install_completion {
         return completion::install(shell);
     }
