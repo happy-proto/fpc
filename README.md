@@ -25,7 +25,10 @@ cargo binstall fpc
 ```sh
 fpc                    # Find a file or directory and copy its absolute path
 fpc ./src/main.rs      # Copy the specified file's absolute path
+fpc --doctor           # Show clipboard routing and terminal diagnostics
 ```
+
+The doctor report includes the build, terminal environment, selected clipboard route, and controlling TTY status. It does not write to the clipboard.
 
 The picker searches beneath the current directory, including hidden and Git-ignored paths.
 

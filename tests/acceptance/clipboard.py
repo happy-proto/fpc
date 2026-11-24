@@ -181,7 +181,10 @@ def scenario(root, binary, ghostty, ssh, mode, filename):
         "window-save-state = never\nterm = xterm-256color\n"
     )
     environment = os.environ.copy()
-    for key in ("TMUX", "TMUX_PANE", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"):
+    for key in (
+        "TMUX", "TMUX_PANE", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY",
+        "TERM_PROGRAM",
+    ):
         environment.pop(key, None)
     environment.update(
         HOME=str(home),

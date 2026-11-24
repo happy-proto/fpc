@@ -166,9 +166,14 @@ def remote_copy(binary, root):
         stub = root / program
         stub.write_text(f'#!/bin/sh\n/bin/cat > "{native_log}"\n')
         stub.chmod(0o700)
-    for variable in ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY", "REX_SESSION"]:
+    for variable, value in [
+        ("SSH_CONNECTION", "remote-session"),
+        ("SSH_CLIENT", "remote-session"),
+        ("SSH_TTY", "remote-session"),
+        ("TERM_PROGRAM", "rex"),
+    ]:
         env = environment(root) | {
-            variable: "remote-session",
+            variable: value,
             "PATH": str(root),
             "DISPLAY": "fixture",
             "WAYLAND_DISPLAY": "fixture",
@@ -183,6 +188,7 @@ def remote_copy(binary, root):
         finally:
             process.close()
         assert not native_log.exists(), variable
+
         output = subprocess.run(
             [str(binary), "--", name],
             cwd=root,
@@ -195,6 +201,16 @@ def remote_copy(binary, root):
         assert b"Clipboard unavailable" in output.stderr, output
         assert b"\x1b]52;" not in output.stdout + output.stderr, output
         assert not native_log.exists(), variable
+
+    process = Process(binary, ["--doctor"], root, env)
+    try:
+        stdout, stderr = process.finish()
+        assert b"Clipboard route: OSC 52 (TERM_PROGRAM=rex)" in stdout, stdout
+        assert b"/dev/tty: writable" in stdout, stdout
+        assert stderr == process.output == b"", (stderr, process.output)
+    finally:
+        process.close()
+    assert not native_log.exists()
 
 
 def picker(binary, root, arguments, query, target=None, keys=b"\r"):

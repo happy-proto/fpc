@@ -3,7 +3,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use std::{
     env,
     fs::OpenOptions,
-    io::{Read, Seek, Write},
+    io::{self, IsTerminal, Read, Seek, Write},
     process::{Command, Stdio},
 };
 
@@ -42,6 +42,15 @@ fn present(key: &str) -> bool {
     env::var_os(key).is_some_and(|value| !value.is_empty())
 }
 
+const REMOTE_MARKERS: &[&str] = &["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"];
+
+fn osc_reason() -> Option<&'static str> {
+    if env::var_os("TERM_PROGRAM").as_deref() == Some("rex".as_ref()) {
+        return Some("TERM_PROGRAM=rex");
+    }
+    REMOTE_MARKERS.iter().copied().find(|key| present(key))
+}
+
 pub fn osc52(bytes: &[u8]) -> Vec<u8> {
     format!("\x1b]52;c;{}\x07", STANDARD.encode(bytes)).into_bytes()
 }
@@ -74,65 +83,124 @@ fn tmux_client<'a>(clients: &'a str, pane: &str) -> Option<&'a str> {
         .map(|(tty, _)| tty)
 }
 
-fn osc_copy(bytes: &[u8]) -> Result<()> {
-    let mut tty = OpenOptions::new()
+fn osc_tty() -> Result<std::fs::File> {
+    OpenOptions::new()
         .write(true)
         .open("/dev/tty")
-        .context("No controlling terminal for OSC 52")?;
+        .context("No controlling terminal for OSC 52")
+}
+
+fn osc_copy(bytes: &[u8]) -> Result<()> {
+    let mut tty = osc_tty()?;
     tty.write_all(&osc52(bytes))?;
     tty.flush()?;
     Ok(())
 }
 
+fn tmux_target() -> Result<String> {
+    // Prefer the most recently active client viewing this pane. Mirrored clients
+    // cannot be distinguished reliably from inside the pane.
+    let pane = env::var("TMUX_PANE").context("TMUX_PANE is missing")?;
+    let session = tmux_output(&["display-message", "-p", "-t", &pane, "#{session_id}"])?;
+    if session.trim().is_empty() {
+        bail!("No tmux session for this pane");
+    }
+    let clients = tmux_output(&[
+        "list-clients",
+        "-t",
+        session.trim(),
+        "-F",
+        "#{client_tty}\t#{pane_id}\t#{client_activity}",
+    ])?;
+    tmux_client(&clients, &pane)
+        .map(str::to_owned)
+        .context("No attached tmux client viewing this pane")
+}
+
+type NativeCommand = (&'static str, &'static [&'static str], Option<&'static str>);
+
+#[cfg(target_os = "macos")]
+const NATIVE: &[NativeCommand] = &[("pbcopy", &[], None)];
+#[cfg(target_os = "linux")]
+const NATIVE: &[NativeCommand] = &[
+    ("wl-copy", &[], Some("WAYLAND_DISPLAY")),
+    ("xclip", &["-selection", "clipboard"], Some("DISPLAY")),
+];
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+const NATIVE: &[NativeCommand] = &[];
+
+fn native_commands() -> impl Iterator<Item = (&'static str, &'static [&'static str])> {
+    NATIVE.iter().filter_map(|&(program, args, marker)| {
+        marker.is_none_or(present).then_some((program, args))
+    })
+}
+
+pub fn doctor(out: &mut impl Write) -> io::Result<()> {
+    for key in ["TERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION"] {
+        match env::var_os(key) {
+            Some(value) => writeln!(out, "{key}={value:?}")?,
+            None => writeln!(out, "{key}: unset")?,
+        }
+    }
+    for key in [
+        "REX_BLOCK",
+        "TMUX",
+        "TMUX_PANE",
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+    ]
+    .into_iter()
+    .chain(REMOTE_MARKERS.iter().copied())
+    {
+        let state = match env::var_os(key) {
+            None => "unset",
+            Some(value) if value.is_empty() => "empty",
+            Some(_) => "set",
+        };
+        writeln!(out, "{key}: {state}")?;
+    }
+    writeln!(
+        out,
+        "TTY: stdin={}, stdout={}, stderr={}",
+        io::stdin().is_terminal(),
+        io::stdout().is_terminal(),
+        io::stderr().is_terminal()
+    )?;
+    if present("TMUX") {
+        writeln!(out, "Clipboard route: tmux (TMUX)")?;
+        match tmux_target() {
+            Ok(_) => writeln!(out, "tmux target: attached client found")?,
+            Err(error) => writeln!(out, "tmux target: {error:#}")?,
+        }
+    } else if let Some(reason) = osc_reason() {
+        writeln!(out, "Clipboard route: OSC 52 ({reason})")?;
+    } else {
+        let route = native_commands()
+            .map(|(program, _)| program)
+            .chain(["OSC 52"])
+            .collect::<Vec<_>>();
+        writeln!(out, "Clipboard route: {}", route.join(" -> "))?;
+    }
+    match osc_tty() {
+        Ok(_) => writeln!(out, "/dev/tty: writable")?,
+        Err(error) => writeln!(out, "/dev/tty: {error:#}")?,
+    }
+    writeln!(out, "Clipboard delivery: untested (no clipboard write)")
+}
+
 pub fn copy(bytes: &[u8]) -> Result<()> {
     if present("TMUX") {
-        // Prefer the most recently active client viewing this pane. Mirrored clients
-        // cannot be distinguished reliably from inside the pane.
-        let pane = env::var("TMUX_PANE").context("TMUX_PANE is missing")?;
-        let session = tmux_output(&["display-message", "-p", "-t", &pane, "#{session_id}"])?;
-        if session.trim().is_empty() {
-            bail!("No tmux session for this pane");
-        }
-        let clients = tmux_output(&[
-            "list-clients",
-            "-t",
-            session.trim(),
-            "-F",
-            "#{client_tty}\t#{pane_id}\t#{client_activity}",
-        ])?;
-        let client =
-            tmux_client(&clients, &pane).context("No attached tmux client viewing this pane")?;
-        command_copy("tmux", &["load-buffer", "-w", "-t", client, "-"], bytes)?;
-        return Ok(());
+        let client = tmux_target()?;
+        return command_copy("tmux", &["load-buffer", "-w", "-t", &client, "-"], bytes);
     }
-    // Rex sessions can run remotely without SSH environment variables. Let the
-    // attached terminal handle the clipboard instead of the server's desktop.
-    if present("REX_SESSION")
-        || present("SSH_CONNECTION")
-        || present("SSH_CLIENT")
-        || present("SSH_TTY")
-    {
+    if osc_reason().is_some() {
         return osc_copy(bytes);
     }
     let mut failures = Vec::new();
-    #[cfg(target_os = "macos")]
-    match command_copy("pbcopy", &[], bytes) {
-        Ok(()) => return Ok(()),
-        Err(error) => failures.push(format!("{error:#}")),
-    }
-    #[cfg(target_os = "linux")]
-    {
-        if present("WAYLAND_DISPLAY") {
-            match command_copy("wl-copy", &[], bytes) {
-                Ok(()) => return Ok(()),
-                Err(error) => failures.push(format!("{error:#}")),
-            }
-        }
-        if present("DISPLAY") {
-            match command_copy("xclip", &["-selection", "clipboard"], bytes) {
-                Ok(()) => return Ok(()),
-                Err(error) => failures.push(format!("{error:#}")),
-            }
+    for (program, args) in native_commands() {
+        match command_copy(program, args, bytes) {
+            Ok(()) => return Ok(()),
+            Err(error) => failures.push(format!("{error:#}")),
         }
     }
     match osc_copy(bytes) {

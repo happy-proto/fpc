@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `--doctor` to report clipboard routing, terminal environment, and TTY availability without writing to the clipboard.
+
+### Fixed
+
+- Use `TERM_PROGRAM=rex` to detect Rex and route clipboard writes through OSC 52.
+
 ## [0.0.4] - 2026-11-03
 
 ### Fixed
