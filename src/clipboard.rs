@@ -42,7 +42,7 @@ fn present(key: &str) -> bool {
     env::var_os(key).is_some_and(|value| !value.is_empty())
 }
 
-const REMOTE_MARKERS: &[&str] = &["REX_SESSION", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"];
+const REMOTE_MARKERS: &[&str] = &["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"];
 
 fn osc_reason() -> Option<&'static str> {
     if env::var_os("TERM_PROGRAM").as_deref() == Some("rex".as_ref()) {

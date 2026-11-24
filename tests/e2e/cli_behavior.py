@@ -170,7 +170,6 @@ def remote_copy(binary, root):
         ("SSH_CONNECTION", "remote-session"),
         ("SSH_CLIENT", "remote-session"),
         ("SSH_TTY", "remote-session"),
-        ("REX_SESSION", "remote-session"),
         ("TERM_PROGRAM", "rex"),
     ]:
         env = environment(root) | {

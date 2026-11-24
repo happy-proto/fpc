@@ -183,7 +183,7 @@ def scenario(root, binary, ghostty, ssh, mode, filename):
     environment = os.environ.copy()
     for key in (
         "TMUX", "TMUX_PANE", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY",
-        "REX_SESSION", "TERM_PROGRAM",
+        "TERM_PROGRAM",
     ):
         environment.pop(key, None)
     environment.update(

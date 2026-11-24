@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Recognize `TERM_PROGRAM=rex` so Rex sessions without `REX_SESSION` use OSC 52.
+- Use `TERM_PROGRAM=rex` to detect Rex and route clipboard writes through OSC 52.
 
 ## [0.0.4] - 2026-11-03
 
