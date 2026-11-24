@@ -19,15 +19,9 @@ concurrency:
 
 jobs:
   ci:
-    name: Checks (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Checks (ubuntu-latest)
+    runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -36,28 +30,19 @@ jobs:
         with:
           install_args: uv jactionlint
       - name: Install Actions lockfile verifier
-        if: runner.os == 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh extension install github/gh-actions-lock --pin v0.2.0
       - name: Lint workflows
-        if: runner.os == 'Linux'
         run: jactionlint --no-online --shellcheck= --pyflakes=
       - name: Verify Actions lockfile
-        if: runner.os == 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh actions-lock --verify
-      - name: Install shells (Linux)
-        if: runner.os == 'Linux'
+      - name: Install shells
         run: |
           sudo apt-get update
           sudo apt-get install -y bash bash-completion fish zsh
-      - name: Install shells (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install bash bash-completion@2 fish zsh
-          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
       - uses: $/.github/actions/setup-rust-ci
         with:
           save-downloads: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -74,7 +59,7 @@ jobs:
       - uses: $/.github/actions/build-diagnostics
         if: always()
         with:
-          name: ci-build-${{ matrix.os }}
+          name: ci-build-ubuntu-latest
 
   required:
     name: CI required
