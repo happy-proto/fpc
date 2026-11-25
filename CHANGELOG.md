@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detailed `--version` output with source commit, dirty state, and build information, plus a short `-V` form.
 
 [Unreleased]: https://github.com/happy-proto/fpc/compare/v0.0.5...HEAD
-[0.0.5]: https://github.com/happy-proto/fpc/compare/v0.0.4...v0.0.5
+[0.0.5]: https://github.com/happy-proto/fpc/releases/tag/v0.0.5
 [0.0.4]: https://github.com/happy-proto/fpc/releases/tag/v0.0.4
 [0.0.3]: https://github.com/happy-proto/fpc/releases/tag/v0.0.3
 [0.0.2]: https://github.com/happy-proto/fpc/releases/tag/v0.0.2
